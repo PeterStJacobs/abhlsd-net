@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="theme-color" content="#002D89">
+
+<!-- Social / share preview -->
+<meta property="og:title" content="ABHLSD">
+<meta property="og:description" content="Aussie • Bear • Loves • Lady • Star • Dust">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://abhlsd.com/">
+<meta property="og:image" content="https://abhlsd.com/ABHLSD-OG.jpg">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ABHLSD">
+<meta name="twitter:description" content="Aussie • Bear • Loves • Lady • Star • Dust">
+<meta name="twitter:image" content="https://abhlsd.com/ABHLSD-OG.jpg">
+
+<title>ABHLSD</title>
+
+<!-- Cursive font for tooltips -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+
+<!-- Favicon / icons -->
+<link rel="icon" type="image/png" sizes="32x32" href="assets/ABHLSD-favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/ABHLSD-favicon-16.png">
+<link rel="apple-touch-icon" href="assets/ABHLSD-apple-touch-icon.png">
+<link rel="icon" href="assets/ABHLSD-favicon-32.png"> <!-- fallback -->
+<meta name="theme-color" content="#002D89">
+
+<style>
+  /* ---------- Global ---------- */
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    color: #e8ecff;
+    overflow: hidden;
+    background: var(--pageBg);   /* NEW */
+  }
+
+  /* Inset from window edges so the image never “kisses” the sides */
+  :root{
+    --padX: 2vw;       /* horizontal inset */
+    --padY: 2vh;       /* vertical inset   */
+    --pageBg: #002D89; /* Page Background Colour */
+  }
+
+  /* ---------- Stage holds both the image and overlay ---------- */
+  .stage{
+    position: fixed;
+    top: var(--padY);
+    bottom: var(--padY);
+    left: var(--padX);
+    right: var(--padX);
+    background: var(--pageBg);       /* shows behind letterbox bars, if any */
+  }
+
+  /* The image fills the stage but keeps full aspect (no cropping) */
+  .bg{
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;       /* << keeps whole image visible */
+    object-position: center;
+    user-select: none; -webkit-user-drag: none;
+  }
+
+  /* The hotspot overlay is absolutely positioned to the image's drawn rect.
+     JS sets its left/top/width/height so it exactly matches the pixels the image occupies. */
+  .hotspots{
+    position: absolute;
+    /* left/top/width/height set by JS in layout() */
+    pointer-events: none;   /* tooltips only on the child buttons */
+  }
+
+  /* ---------- Invisible hotspots with tooltips ---------- */
+  .spot{
+    position: absolute;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: help;
+    outline: none;
+    pointer-events: auto;    /* enable pointer for each button */
+    color: transparent; font-size: 0;  /* no visible text */
+  }
+  .spot:focus-visible { outline: 2px solid rgba(122,162,255,.9); border-radius: 8px; }
+
+  /* Tooltip bubble (uses per-spot --clr variable) */
+  .spot::after{
+    content: attr(data-tt);
+    position: absolute;
+    left: 50%;
+    bottom: 110%;
+    transform: translateX(-50%) translateY(6px);
+    background: var(--pageBg);   /* was rgba(10,15,30,.92) */
+    color: var(--clr, #e8ecff);
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-family: "Great Vibes", cursive;
+    font-size: clamp(18px, 3.5vw, 34px);
+    white-space: nowrap;
+    box-shadow: none;            /* optional: remove glow, was box-shadow: 0 10px 26px rgba(0,0,0,.45); */    
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .spot::before{
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 108%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: var(--pageBg);   /* was rgba(10,15,30,.92) */
+    opacity: 0;
+    transition: opacity .15s ease;
+  }
+  .spot:hover::after, .spot:hover::before,
+  .spot:focus::after, .spot:focus::before{
+    opacity: 1;
+  }
+  .spot:hover::after, .spot:focus::after{
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Show tooltip when a hotspot is “active” (for tap) */
+  .spot.active::after,
+  .spot.active::before { opacity: 1; }
+
+  .spot.active::after {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Tooltip colours (tweak to match the artwork) */
+  :root{
+    --clr-a: #FFFF00;   /* A  → Aussie  (yellow) */
+    --clr-b: #ED7D31;   /* B  → Bear    (orange) */
+    --clr-heart: #FF0000; /* ♥ → Loves   (red) */
+    --clr-l: #00B050;   /* L  → Lady    (green) */
+    --clr-s: #00B0F0;   /* S  → Star    (blue) */
+    --clr-d: #7030A0;   /* D  → Dust    (violet) */
+  }
+
+  /* ---------- Hotspot positions as % of the *image* (not the window) ---------- */
+  /* Adjust these until they sit over your letters—DevTools makes it easy. */
+
+  /* A */
+  .spot-a{
+    --clr: var(--clr-a);
+    top: 38%; left: 0%;
+    width: 18%; height: 24%;
+  }
+  /* B (first B) */
+  .spot-b{
+    --clr: var(--clr-b);
+    top: 38%; left: 19%;
+    width: 18%; height: 24%;
+  }
+  /* Heart (H → Loves) */
+  .spot-heart{
+    --clr: var(--clr-heart);
+    top: 38%; left: 38%;
+    width: 15%; height: 24%;
+  }
+  /* L */
+  .spot-l{
+    --clr: var(--clr-l);
+    top: 38%; left: 52%;
+    width: 13%; height: 24%;
+  }
+  /* S */
+  .spot-s{
+    --clr: var(--clr-s);
+    top: 38%; left: 65%;
+    width: 13%; height: 24%;
+  }
+  /* D */
+  .spot-d{
+    --clr: var(--clr-d);
+    top: 38%; left: 78%;
+    width: 15%; height: 24%;
+  }
+
+  /* ---------- Button to the Mars–Venus page ---------- */
+  .btn{
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--padY) + 28px);
+    transform: translateX(-50%);
+    background: #7aa2ff; color: #0b1020; font-weight: 700;
+    padding: 12px 16px; border-radius: 12px; text-decoration: none;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 12px; }
+</style>
+</head>
+
+<body>
+
+  <!-- Stage wraps image + overlay; it resizes with the window and honors padding -->
+  <div class="stage" id="stage">
+    <!-- Your image (spaces in file name are fine) -->
+    <img class="bg" id="bg"
+         src="assets/ABHLSD Italics - No WP.jpg"
+         alt="ABHLSD artwork" />
+
+    <!-- Hotspot overlay: JS will size/position this to the drawn image rect -->
+    <div class="hotspots" id="hot" ariaassets/-label="Letter tooltips">
+      <button type="button" class="spot spot-a"     data-tt="Aussie" aria-label="Aussie"></button>
+      <button type="button" class="spot spot-b"     data-tt="Bear"   aria-label="Bear"></button>
+      <button type="button" class="spot spot-heart" data-tt="Loves"  aria-label="Loves"></button>
+      <button type="button" class="spot spot-l"     data-tt="Lady"   aria-label="Lady"></button>
+      <button type="button" class="spot spot-s"     data-tt="Star"   aria-label="Star"></button>
+      <button type="button" class="spot spot-d"     data-tt="Dust"   aria-label="Dust"></button>
+    </div>
+  </div>
+
+  <!-- Link to your Mars–Venus tool (relative path) -->
+  <a class="btn" href="./mars-venus/index.html">Mars–Venus Separation</a>
+
+<script>
+/* Measure the image's drawn rectangle (with object-fit: contain) and
+   resize/position the hotspot overlay to match it exactly. */
+(function(){
+  const stage = document.getElementById('stage');
+  const img   = document.getElementById('bg');
+  const hot   = document.getElementById('hot');
+
+  function layout(){
+    // Stage size in CSS pixels
+    const sw = stage.clientWidth;
+    const sh = stage.clientHeight;
+
+    // Image intrinsic size
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (!iw || !ih) return;  // image not loaded yet
+
+    // Calculate drawn size for object-fit: contain
+    const scale = Math.min(sw / iw, sh / ih);
+    const drawW = iw * scale;
+    const drawH = ih * scale;
+    const offX  = (sw - drawW) / 2;
+    const offY  = (sh - drawH) / 2;
+
+    // Place the overlay to exactly cover the drawn image area
+    hot.style.left   = offX + 'px';
+    hot.style.top    = offY + 'px';
+    hot.style.width  = drawW + 'px';
+    hot.style.height = drawH + 'px';
+  }
+
+  // When the image loads (or if it’s already cached), run layout
+  if (img.complete) layout();
+  else img.addEventListener('load', layout);
+
+  // Recompute on window resize and orientation changes
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', layout);
+})();
+</script>
+
+<script>
+(function(){
+  const spots = Array.from(document.querySelectorAll('.spot'));
+
+  // Toggle on click/tap; close siblings
+  spots.forEach(btn=>{
+    btn.setAttribute('aria-expanded','false');
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const makeActive = !btn.classList.contains('active');
+      spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
+      if (makeActive) { btn.classList.add('active'); btn.setAttribute('aria-expanded','true'); }
+    });
+  });
+
+  // Click outside closes any open tooltip
+  document.addEventListener('click', ()=>{
+    spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
+  });
+
+  // ESC closes too (keyboard/screenreader friendly)
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape'){
+      spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
