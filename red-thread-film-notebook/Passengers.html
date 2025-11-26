@@ -39,6 +39,34 @@
     p {
       margin: 0 0 1rem 0;
     }
+  
+  .topbar { display:flex; align-items:center; margin-bottom:8px; }
+  .back {
+    background:#2b3252;
+    color:var(--text);
+    font-weight:700;
+    padding:8px 12px;
+    border-radius:10px;
+    text-decoration:none;
+    border:1px solid var(--border);
+    display:inline-flex; gap:6px; align-items:center;
+  }
+  .back:hover { filter:brightness(1.05); }
+
+  .sticky-pane {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(180deg, rgba(11,16,32,0.98), rgba(11,16,32,0.98));
+    padding-top: 6px;
+    margin-bottom: 12px;
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+  }
+  @media (max-width: 820px), (max-height: 720px) {
+    .sticky-pane { position: static; backdrop-filter:none; border-bottom:none; }
+  }
+  
   </style>
 </head>
 <body>
