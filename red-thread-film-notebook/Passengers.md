@@ -40,4 +40,5 @@ There are other players within the story. They do not necessarily appear within 
 
 I am sure, if you have read this far, Andromeda Adored, you will undoubtedly see the parallels between the Passengers upon the Avalon and our own parallel transits of this complicated, at times chaotic world. Drifting as I was to who knows where when we reconnected, your steadying hand captured my distant tether. Yet, whilst maintaining a stable orbit closer than either of us believed possible, I have sought to ensure that no temporicide is committed. It is not I who seeks to bend another’s universe to my will. I neither want to constrain nor control you within your world, nor do I wish to slam into the ship of another’s life. Yet, even at this great distance, even after all this time, there is less doubt in my mind, within my heart, than at any time ever before, about the continuing correlation of the Wavefunction of Love that is shared. I remain forever, willingly entangled within The Red Thread that has always been between us, the one we discovered all those years ago.
 
-[← Back to Red Thread Film Notebook index](./README.md)
+[← Back to Red Thread Film Notebook index](./index.html)
+
