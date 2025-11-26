@@ -1,4 +1,4 @@
-# The Read Thread Film Notebook
+# The Red Thread Film Notebook
 # This one is for you, Tamara.
 
 Entries
