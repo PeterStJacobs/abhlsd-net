@@ -185,17 +185,35 @@
   }
 
   /* ---------- Button to the Mars–Venus page ---------- */
-  .btn{
-    position: fixed;
-    left: 50%;
-    bottom: calc(var(--padY) + 28px);
-    transform: translateX(-50%);
-    background: #7aa2ff; color: #0b1020; font-weight: 700;
-    padding: 12px 16px; border-radius: 12px; text-decoration: none;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
-  }
-  .btn:hover { filter: brightness(1.05); }
-  .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 12px; }
+  .btn-row {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--padY) + 28px);
+  transform: translateX(-50%);
+
+  display: flex;
+  gap: 16px;           /* space between the buttons */
+}
+
+ .btn {
+  /* no position / left / bottom / transform here anymore */
+  background: #7aa2ff;
+  color: #0b1020;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  display: inline-block;  /* just to be safe */
+}
+
+.btn:hover { filter: brightness(1.05); }
+.btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
 </style>
 </head>
 
@@ -219,11 +237,14 @@
     </div>
   </div>
 
+<div class="btn-row">
   <!-- Link to your Mars–Venus tool (relative path) -->
   <a class="btn" href="./mars-venus/index.html">Mars–Venus Separation</a>
 
   <!-- Link to the Red Thread Film Notebook -->
-  <a class="btn" href=""/red-thread-film-notebook/README.md">Index</a>
+  <a class="btn" href="./red-thread-film-notebook/README.md">Film Notebook Index</a>
+</div>
+
 
 <script>
 /* Measure the image's drawn rectangle (with object-fit: contain) and
@@ -299,4 +320,5 @@
 </body>
 
 </html>
+
 
