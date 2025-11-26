@@ -119,12 +119,7 @@
 </head>
 <body>
   <div class="wrap">
-<!--
-    <div class="topbar">
-      <a id="backLink" class="back" href="../index.html" aria-label="Back to ABHLSD">← Back to ABHLSD</a>
-    </div>
--->
-    
+  
     <!-- STICKY PANE: title + main controls -->
     <div class="sticky-pane">
       <div class="topbar">
@@ -134,6 +129,7 @@
       <h1>Mars–Venus: Angular Separation & Planet–Planet Distance</h1>
       <p class="lead">Local calculations via astronomy-engine. Toggle topocentric angle. Presets + elevation + current location. Time charts honor the timezone toggle; the Angle–Distance chart has its own legend.</p>
 
+      <!--
       <div class="card">
         <div class="grid two">
           <div>
@@ -194,7 +190,70 @@
           </div>
         </div>
       </div>
+      -->
     </div><!-- /sticky-pane -->
+
+          <div class="card">
+        <div class="grid two">
+          <div>
+            <label for="dt">Date & time (local)</label>
+            <input id="dt" type="datetime-local" />
+            <div class="buttons" style="margin-top:10px;">
+              <button id="btn-now" type="button">Use current time</button>
+              <button id="btn-calc" type="button">Calculate</button>
+            </div>
+
+            <div class="checkrow">
+              <input id="chk-topo" type="checkbox" />
+              <label for="chk-topo" style="margin:0;">Use topocentric angle (location-dependent)</label>
+              <span class="tip">
+                <button class="tip-btn" aria-label="What does topocentric mean?" aria-describedby="tip-topo">?</button>
+                <div id="tip-topo" role="tooltip" class="tip-content">
+                  <p><strong>Geocentric</strong> angle: from Earth’s center (default). Same for all locations.</p>
+                  <p><strong>Topocentric</strong> angle: from your site (includes parallax). Can differ slightly by location.</p>
+                  <ul>
+                    <li>Effect size (planets): typically a few to a few tens of arcseconds (~0.01°).</li>
+                    <li>Plots, scan and CSV use whichever mode is selected.</li>
+                  </ul>
+                </div>
+              </span>
+            </div>
+
+            <div class="checkrow">
+              <input id="chk-use-obs-tz" type="checkbox" checked />
+              <label for="chk-use-obs-tz" style="margin:0;">Use observer timezone for time charts (otherwise UTC)</label>
+            </div>
+
+            <div class="checkrow">
+              <input id="chk-time-arrows" type="checkbox" />
+              <label for="chk-time-arrows" style="margin:0;">Show time arrows on Angle–Distance plot</label>
+            </div>
+            <div class="checkrow">
+              <input id="chk-time-gradient" type="checkbox" />
+              <label for="chk-time-gradient" style="margin:0;">Color Angle–Distance path by time (early→late)</label>
+            </div>
+
+            <div id="err" class="error" role="alert" aria-live="polite"></div>
+            <p class="small">Angle uses geocentric (checkbox off) or topocentric (checkbox on). Distance is heliocentric; Alt/Az readouts are topocentric.</p>
+          </div>
+
+          <div>
+            <div class="results">
+              <div class="tile">
+                <div class="k">Angular separation</div>
+                <div class="v" id="angle">—</div>
+                <div class="sub mono" id="angle-sub">—</div>
+              </div>
+              <div class="tile">
+                <div class="k">Planet–planet distance</div>
+                <div class="v" id="dist-au">—</div>
+                <div class="sub mono" id="dist-km">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
 
     <!-- Planet readouts -->
     <div class="grid two" style="margin-top:16px;">
@@ -826,4 +885,5 @@
 </script>
 </body>
 </html>
+
 
