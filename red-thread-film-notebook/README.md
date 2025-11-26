@@ -2,5 +2,5 @@
 # This one is for you, Tamara.
 
 Entries
-1. (./red-thread-film-notebook/passengers.md)
+1. [Passengers] (./passengers.md)
 2. The Martian - tbc
