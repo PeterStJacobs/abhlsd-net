@@ -95,7 +95,7 @@
     padding: 8px 10px;
     border-radius: 10px;
     font-family: "Great Vibes", cursive;
-    font-size: clamp(14px, 2.2vw, 22px);
+    font-size: clamp(18px, 3.5vw, 34px);
     white-space: nowrap;
     line-height: 1.2;
     text-shadow: 0 0 6px rgba(0,0,0,.25);
@@ -177,6 +177,7 @@
 :root{
   --mottoY: 70%;       /* tweak this up/down to sit nicely under the ABHLSD letters */
   --mottoClr: #FFFF00; /* change if you want it brighter/dimmer */
+  --mottoSize: clamp(14px, 2.6vw, 32px);   /* ✅ CHANGED: motto size only */
 }
 
 .motto{
@@ -185,7 +186,7 @@
   top: var(--mottoY);
   transform: translate(-50%);
   font-family: "Great Vibes", cursive;
-  font-size: clamp(16px, 3.2vw, 38px);
+  font-size: var(--mottoSize);             /* ✅ CHANGED: motto size only */
   color: var(--mottoClr);
   opacity: 0;
   pointer-events: none;
@@ -352,6 +353,7 @@
 
 </body>
 </html>
+
 
 
 
