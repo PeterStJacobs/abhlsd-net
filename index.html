@@ -183,15 +183,46 @@
   position: absolute;
   left: 50%;
   top: var(--mottoY);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%);
   font-family: "Great Vibes", cursive;
-  font-size: clamp(22px, 4.6vw, 56px);
+  font-size: clamp(16px, 3.2vw, 38px);
   color: var(--mottoClr);
   opacity: 0;
   pointer-events: none;
   white-space: nowrap;
 }
 
+/* NEW: make the & be the exact anchor point at left:50% */
+.motto-amp{
+  position: relative;
+  left: 0;                       /* anchor itself at the container's left edge */
+}
+
+/* NEW: shift the whole phrase so the & sits at x = 50% */
+.motto{
+  transform: translateY(-50%);
+}
+.motto-left{ position: relative; left: 0; }
+.motto-right{ position: relative; left: 0; }
+
+/* NEW: move the block left by the width of "Always " plus half of "&" width */
+.motto{
+  /* This is the trick: we use flex so the ampersand can be the anchor point */
+  display: inline-flex;          /* NEW */
+  align-items: baseline;         /* NEW */
+}
+
+.motto-left{
+  transform: translateX(-100%);  /* NEW: pull left part entirely to the left of & */
+}
+
+.motto-amp{
+  transform: translateX(-50%);   /* NEW: place the centre of & on the anchor */
+}
+
+.motto-right{
+  transform: translateX(-50%);   /* NEW: keep right part starting from & anchor */
+  
 .motto.flash{
   animation: mottoFlash 1.6s ease-in-out;
 }
@@ -226,7 +257,10 @@
       <button type="button" class="spot spot-s"     data-tt="Star"   aria-label="Star"></button>
       <button type="button" class="spot spot-d"     data-tt="Dust"   aria-label="Dust"></button>
 
-      <div class="motto" id="motto" aria-hidden="true">Always &amp; Forever</div>
+      <div class="motto" id="motto" aria-hidden="true">
+         <span class="motto-left">Always </span><span class="motto-amp">&amp;</span><span class="motto-right"> Forever</span>
+      </div>
+
     </div>
   </div>
 
@@ -318,6 +352,7 @@
 
 </body>
 </html>
+
 
 
 
