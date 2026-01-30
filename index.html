@@ -168,6 +168,41 @@
     outline-offset: 2px;
     border-radius: 12px;
   }
+
+  /* ---------- Motto flash ---------- */
+:root{
+  --mottoY: 74%;       /* tweak this up/down to sit nicely under the ABHLSD letters */
+  --mottoClr: #e8ecff; /* change if you want it brighter/dimmer */
+}
+
+.motto{
+  position: absolute;
+  left: 50%;
+  top: var(--mottoY);
+  transform: translate(-50%, -50%);
+  font-family: "Great Vibes", cursive;
+  font-size: clamp(22px, 4.6vw, 56px);
+  color: var(--mottoClr);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.motto.flash{
+  animation: mottoFlash 1.6s ease-in-out;
+}
+
+@keyframes mottoFlash{
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(.985); }
+  18%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  72%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .motto.flash{ animation: none; opacity: 1; }
+}
+
 </style>
 </head>
 
@@ -186,6 +221,8 @@
       <button type="button" class="spot spot-l"     data-tt="Lady"   aria-label="Lady"></button>
       <button type="button" class="spot spot-s"     data-tt="Star"   aria-label="Star"></button>
       <button type="button" class="spot spot-d"     data-tt="Dust"   aria-label="Dust"></button>
+
+      <div class="motto" id="motto" aria-hidden="true">Always &amp; Forever</div>
     </div>
   </div>
 
@@ -232,21 +269,41 @@
 <script>
 (function(){
   const spots = Array.from(document.querySelectorAll('.spot'));
+  const motto = document.getElementById('motto');
 
+  function flashMotto(){
+    if (!motto) return;
+    motto.classList.remove('flash');  // restart animation cleanly
+    void motto.offsetWidth;           // reflow
+    motto.classList.add('flash');
+  }
+
+  // Flash on page load/refresh
+  window.addEventListener('load', flashMotto);
+
+  // Flash on hover/focus of any letter
   spots.forEach(btn=>{
     btn.setAttribute('aria-expanded','false');
+
+    btn.addEventListener('mouseenter', flashMotto);
+    btn.addEventListener('focus', flashMotto);
+
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
+      flashMotto();
+
       const makeActive = !btn.classList.contains('active');
       spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
       if (makeActive) { btn.classList.add('active'); btn.setAttribute('aria-expanded','true'); }
     });
   });
 
+  // Click outside closes any open tooltip
   document.addEventListener('click', ()=>{
     spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
   });
 
+  // ESC closes too
   document.addEventListener('keydown', (e)=>{
     if (e.key === 'Escape'){
       spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
@@ -254,5 +311,7 @@
   });
 })();
 </script>
+
 </body>
 </html>
+
