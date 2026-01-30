@@ -114,7 +114,7 @@
     text-shadow: 0 0 6px rgba(0,0,0,.25);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .25s ease, transform .25s ease;
+    transition: opacity 1s ease, transform 1s ease;
   }
   .spot::before{
     content: "";
@@ -180,8 +180,7 @@
   .motto{
     position: absolute;
     left: 0; top: 0;   /* JS will set these (px) after layout */
-    width: 0;
-    height: 0;
+    transform: translateY(-50%);
     font-family: "Great Vibes", cursive;
     font-size: var(--mottoSize);
     color: var(--mottoClr);
@@ -232,9 +231,7 @@
       <button type="button" class="spot spot-d"     data-tt="Dust"   aria-label="Dust"></button>
 
       <div class="motto" id="motto" aria-hidden="true">
-        <span class="motto-left">Always </span>
-        <span class="motto-amp">&amp;</span>
-        <span class="motto-right"> Forever</span>
+        Always&nbsp;<span class="motto-amp">&amp;</span>&nbsp;Forever
       </div>
     </div>
   </div>
@@ -252,21 +249,39 @@
   const heart = document.querySelector('.spot-heart');
   const motto = document.getElementById('motto');
 
-  function positionMotto(drawH){
-    if (!motto || !heart) return;
+function positionMotto(drawH){
+  if (!motto || !heart) return;
 
-    const hr = heart.getBoundingClientRect();
-    const hotR = hot.getBoundingClientRect();
+  const hr   = heart.getBoundingClientRect();
+  const hotR = hot.getBoundingClientRect();
 
-    const cx = ((hr.left + hr.right) / 2) - hotR.left;
+  // Anchor point inside the HEART hotspot box.
+  // X=0.50 is centre. Y=0.92 is near the bottom point.
+  const heartPointX = 0.50;
+  const heartPointY = 0.92;
 
-    // place below the heart. dy scales with image height, clamped.
-    const dy = Math.max(10, Math.min(28, drawH * 0.035));
-    const top = (hr.bottom - hotR.top) + dy;
+  const ax = (hr.left + hr.width  * heartPointX) - hotR.left;
+  const ay = (hr.top  + hr.height * heartPointY) - hotR.top;
 
-    motto.style.left = cx + 'px';
-    motto.style.top  = top + 'px';
-  }
+  // Small gap below the heart point (scales with image height, clamped)
+  const dy = Math.max(8, Math.min(26, drawH * 0.030));
+  const top = ay + dy;
+
+  // Put motto at top, temporarily at left=0 for measurement
+  motto.style.top  = top + 'px';
+  motto.style.left = '0px';
+
+  // Measure where the ampersand sits inside the motto, then shift so amp-centre = ax
+  const ampEl = motto.querySelector('.motto-amp');
+  if (!ampEl) return;
+
+  const mR = motto.getBoundingClientRect();
+  const aR = ampEl.getBoundingClientRect();
+  const ampCenterOffset = (aR.left + aR.width / 2) - mR.left;
+
+  motto.style.left = (ax - ampCenterOffset) + 'px';
+}
+
 
   function layout(){
     const sw = stage.clientWidth;
@@ -343,3 +358,4 @@
 
 </body>
 </html>
+
