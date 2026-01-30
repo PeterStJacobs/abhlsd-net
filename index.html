@@ -53,8 +53,7 @@
 
     /* Motto only */
     --mottoClr: #FFFF00;
-    --mottoSize: clamp(14px, 2.6vw, 32px);
-    --mottoGap: 0.35em; /* spacing either side of & */
+    --mottoSize: clamp(14px, 2.6vw, 32px); /* smaller than tooltips */
   }
 
   .stage{
@@ -74,13 +73,14 @@
     user-select: none; -webkit-user-drag: none;
   }
 
-  /* Important: give hotspots a fallback size, then JS refines it to image-drawn rect */
+  /* Overlay sized by JS to the drawn image rect.
+     Fallback size keeps hover alive even before layout completes. */
   .hotspots{
     position: absolute;
     left: 0; top: 0;
     width: 100%; height: 100%;
-    z-index: 2;
     pointer-events: none;
+    z-index: 2;
   }
 
   .spot{
@@ -108,7 +108,7 @@
     padding: 8px 10px;
     border-radius: 10px;
     font-family: "Great Vibes", cursive;
-    font-size: clamp(18px, 3.5vw, 34px); /* tooltip size stays as-is */
+    font-size: clamp(18px, 3.5vw, 34px); /* tooltip size */
     white-space: nowrap;
     line-height: 1.2;
     text-shadow: 0 0 6px rgba(0,0,0,.25);
@@ -127,6 +127,7 @@
     opacity: 0;
     transition: opacity .15s ease;
   }
+
   .spot:hover::after, .spot:hover::before,
   .spot:focus::after, .spot:focus::before{ opacity: 1; }
   .spot:hover::after, .spot:focus::after{
@@ -176,11 +177,10 @@
     border-radius: 12px;
   }
 
-  /* Motto: anchored so the & sits on left/top set by JS */
+  /* ---------- Motto ---------- */
   .motto{
     position: absolute;
-    left: 0; top: 0;   /* JS will set these (px) after layout */
-    transform: translateY(-50%);
+    left: 0; top: 0; /* JS sets exact px position */
     font-family: "Great Vibes", cursive;
     font-size: var(--mottoSize);
     color: var(--mottoClr);
@@ -189,15 +189,10 @@
     pointer-events: none;
     opacity: 0;
     z-index: 4;
+    transform: none; /* JS top is top of text */
   }
 
-  .motto-left, .motto-amp, .motto-right{
-    position: absolute;
-    top: 0;
-  }
-  .motto-left{ right: var(--mottoGap); }
-  .motto-amp{ left: 0; transform: translateX(-50%); } /* centre & on the anchor */
-  .motto-right{ left: var(--mottoGap); }
+  .motto-amp{ display: inline-block; } /* lets JS measure the & */
 
   .motto.flash{ animation: mottoFlash 1.6s ease-in-out; }
 
@@ -249,39 +244,38 @@
   const heart = document.querySelector('.spot-heart');
   const motto = document.getElementById('motto');
 
-function positionMotto(drawH){
-  if (!motto || !heart) return;
+  function positionMotto(drawH){
+    if (!motto || !heart) return;
 
-  const hr   = heart.getBoundingClientRect();
-  const hotR = hot.getBoundingClientRect();
+    const hr   = heart.getBoundingClientRect();
+    const hotR = hot.getBoundingClientRect();
 
-  // Anchor point inside the HEART hotspot box.
-  // X=0.50 is centre. Y=0.92 is near the bottom point.
-  const heartPointX = 0.50;
-  const heartPointY = 0.92;
+    /* Tweak knobs (if needed)
+       X nudges left/right, Y nudges where “heart point” is inside the hotspot box */
+    const heartPointX = 0.50;
+    const heartPointY = 1.00;
 
-  const ax = (hr.left + hr.width  * heartPointX) - hotR.left;
-  const ay = (hr.top  + hr.height * heartPointY) - hotR.top;
+    const ax = (hr.left + hr.width  * heartPointX) - hotR.left;
+    const ay = (hr.top  + hr.height * heartPointY) - hotR.top;
 
-  // Small gap below the heart point (scales with image height, clamped)
-  const dy = Math.max(8, Math.min(26, drawH * 0.030));
-  const top = ay + dy;
+    // Tiny gap below the point (keep it almost “touching”)
+    const dy = Math.max(1, Math.min(8, drawH * 0.010));
+    const top = ay + dy;
 
-  // Put motto at top, temporarily at left=0 for measurement
-  motto.style.top  = top + 'px';
-  motto.style.left = '0px';
+    // Set vertical position first
+    motto.style.top  = top + 'px';
 
-  // Measure where the ampersand sits inside the motto, then shift so amp-centre = ax
-  const ampEl = motto.querySelector('.motto-amp');
-  if (!ampEl) return;
+    // Measure where the & sits inside the motto, then shift so & centre = ax
+    motto.style.left = '0px';
+    const ampEl = motto.querySelector('.motto-amp');
+    if (!ampEl) return;
 
-  const mR = motto.getBoundingClientRect();
-  const aR = ampEl.getBoundingClientRect();
-  const ampCenterOffset = (aR.left + aR.width / 2) - mR.left;
+    const mR = motto.getBoundingClientRect();
+    const aR = ampEl.getBoundingClientRect();
+    const ampCenterOffset = (aR.left + aR.width / 2) - mR.left;
 
-  motto.style.left = (ax - ampCenterOffset) + 'px';
-}
-
+    motto.style.left = (ax - ampCenterOffset) + 'px';
+  }
 
   function layout(){
     const sw = stage.clientWidth;
@@ -322,12 +316,14 @@ function positionMotto(drawH){
   function flashMotto(){
     if (!motto) return;
     motto.classList.remove('flash');
-    void motto.offsetWidth;
+    void motto.offsetWidth;  // reflow to restart animation
     motto.classList.add('flash');
   }
 
+  // Flash on refresh
   window.addEventListener('load', flashMotto);
 
+  // Flash on rollover / focus / tap
   spots.forEach(btn=>{
     btn.setAttribute('aria-expanded','false');
 
@@ -344,10 +340,12 @@ function positionMotto(drawH){
     });
   });
 
+  // Click outside closes any open tooltip
   document.addEventListener('click', ()=>{
     spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
   });
 
+  // ESC closes too
   document.addEventListener('keydown', (e)=>{
     if (e.key === 'Escape'){
       spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
@@ -358,4 +356,3 @@ function positionMotto(drawH){
 
 </body>
 </html>
-
