@@ -87,7 +87,7 @@
   .spot::after{
     content: attr(data-tt);
     position: absolute;
-    left: 50%;
+    left: calc(100% + 12px);
     bottom: 110%;
     transform: translateX(-50%) translateY(6px);
     background: var(--pageBg);
@@ -95,12 +95,15 @@
     padding: 8px 10px;
     border-radius: 10px;
     font-family: "Great Vibes", cursive;
-    font-size: clamp(18px, 3.5vw, 34px);
+    font-size: clamp(14px, 2.2vw, 22px);
     white-space: nowrap;
+    line-height: 1.2;
+    text-shadow: 0 0 6px rgba(0,0,0,.25);
     box-shadow: none;
     opacity: 0;
     pointer-events: none;
-    transition: opacity .15s ease, transform .15s ease;
+    transition: opacity .25s ease, transform .25s ease;
+    max-width: none;
   }
   .spot::before{
     content: "";
@@ -315,6 +318,7 @@
 
 </body>
 </html>
+
 
 
 
