@@ -111,6 +111,7 @@
     font-size: clamp(18px, 3.5vw, 34px); /* tooltip size */
     white-space: nowrap;
     line-height: 1.2;
+    font-weight: 900;
     text-shadow: 0 0 6px rgba(0,0,0,.25);
     opacity: 0;
     pointer-events: none;
@@ -163,7 +164,6 @@
   .btn {
     background: #7aa2ff;
     color: #0b1020;
-    font-weight: 700;
     padding: 12px 16px;
     border-radius: 12px;
     text-decoration: none;
@@ -187,13 +187,23 @@
     line-height: 1;
     white-space: nowrap;
     pointer-events: none;
-    opacity: 0;
     z-index: 4;
-    transform: none; /* JS top is top of text */
+
+    /* start hidden, fade in like tooltips */
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+
+  /* When "on", it fades in and lifts slightly (same vibe as tooltips) */
+  .motto.on{
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .motto-amp{ display: inline-block; } /* lets JS measure the & */
 
+<!--
   .motto.flash{ animation: mottoFlash 1.6s ease-in-out; }
 
   @keyframes mottoFlash{
@@ -202,6 +212,7 @@
     75%  { opacity: 1; }
     100% { opacity: 0; }
   }
+-->
 
   @media (prefers-reduced-motion: reduce){
     .motto.flash{ animation: none; opacity: 1; }
@@ -252,7 +263,8 @@
 
     /* Tweak knobs (if needed)
        X nudges left/right, Y nudges where “heart point” is inside the hotspot box */
-    const heartPointX = 0.275;
+
+    const heartPointX = 0.40;
     const heartPointY = 1.00;
 
     const ax = (hr.left + hr.width  * heartPointX) - hotR.left;
@@ -313,26 +325,73 @@
   const spots = Array.from(document.querySelectorAll('.spot'));
   const motto = document.getElementById('motto');
 
-  function flashMotto(){
+  let leaveTimer = null;
+  let inLetters = false;
+
+  const LEAVE_GRACE_MS = 140;   // prevents “gap” exits when moving between letters
+  const LINGER_MS      = 1000;  // how long motto stays after leaving letters (a few seconds)
+
+  function showMotto(){
     if (!motto) return;
-    motto.classList.remove('flash');
-    void motto.offsetWidth;  // reflow to restart animation
-    motto.classList.add('flash');
+    motto.classList.add('on');
   }
 
-  // Flash on refresh
-  window.addEventListener('load', flashMotto);
+  function scheduleHide(){
+    if (!motto) return;
 
-  // Flash on rollover / focus / tap
+    // If we really left the letters, keep it visible for a few seconds, then fade out
+    leaveTimer = setTimeout(() => {
+      inLetters = false;
+      motto.classList.remove('on');
+    }, LINGER_MS);
+  }
+
+  function enterLetters(){
+    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+
+    if (!inLetters){
+      inLetters = true;
+      showMotto();
+    } else {
+      // already “in letters”, just ensure it stays on
+      showMotto();
+    }
+  }
+
+  function leaveLetters(){
+    if (leaveTimer) clearTimeout(leaveTimer);
+
+    // Grace period so crossing tiny gaps doesn't count as leaving
+    leaveTimer = setTimeout(() => {
+      // after grace, start the linger timer
+      scheduleHide();
+    }, LEAVE_GRACE_MS);
+  }
+
+  // Show briefly on page load (optional, keeps your original “refresh shows motto” behaviour)
+  window.addEventListener('load', () => {
+    showMotto();
+    // If user doesn't hover letters, it will fade away after LINGER_MS
+    if (leaveTimer) clearTimeout(leaveTimer);
+    leaveTimer = setTimeout(() => {
+      if (!inLetters && motto) motto.classList.remove('on');
+    }, LINGER_MS);
+  });
+
   spots.forEach(btn=>{
     btn.setAttribute('aria-expanded','false');
 
-    btn.addEventListener('mouseenter', flashMotto);
-    btn.addEventListener('focus', flashMotto);
+    btn.addEventListener('mouseenter', enterLetters);
+    btn.addEventListener('mouseleave', leaveLetters);
+
+    btn.addEventListener('focus', enterLetters);
+    btn.addEventListener('blur', leaveLetters);
 
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
-      flashMotto();
+
+      // keep motto visible on tap as well
+      enterLetters();
 
       const makeActive = !btn.classList.contains('active');
       spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
@@ -340,7 +399,7 @@
     });
   });
 
-  // Click outside closes any open tooltip
+  // Click outside closes any open tooltip (your existing behaviour)
   document.addEventListener('click', ()=>{
     spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
   });
@@ -354,9 +413,6 @@
 })();
 </script>
 
+
 </body>
 </html>
-
-
-
-
