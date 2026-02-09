@@ -15,6 +15,15 @@ const DEFAULTS = {
 
 const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
+// Luxon startOf('week') follows locale (often Monday). AFdS UI is SUN→SAT.
+function startOfWeekSunday(dt){
+  // Luxon weekday: 1=Mon ... 7=Sun
+  return dt.startOf('day').minus({days: dt.weekday % 7});
+}
+function endOfWeekSaturday(dt){
+  return startOfWeekSunday(dt).plus({days: 6}).endOf('day');
+}
+
 const state = {
   view: 'month',
   displayTZ: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -202,8 +211,8 @@ function renderMonthView(){
   wrap.appendChild(dow);
 
   const dt = DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ});
-  const start = dt.startOf('month').startOf('week'); // Sunday-start
-  const end = dt.endOf('month').endOf('week');
+  const start = startOfWeekSunday(dt.startOf('month')); // Sunday-start (forced)
+  const end = endOfWeekSaturday(dt.endOf('month'));
   let cursor = start;
 
   while(cursor <= end){
@@ -306,7 +315,7 @@ function renderWeekView(){
 
   const dow = document.createElement('div');
   dow.className = 'dow';
-  const dt = DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ}).startOf('week');
+  const dt = startOfWeekSunday(DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ}));
   for(let i=0;i<7;i++){
     const d = dt.plus({days:i});
     const cell = document.createElement('div');
