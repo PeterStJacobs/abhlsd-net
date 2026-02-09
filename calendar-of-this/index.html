@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>An Féilire de Seo | Calendar of This (V2 Prototype)</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">An Féilire de Seo</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">V2 Prototype</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel left" id="leftPanel">
+        <div class="panel-inner">
+          <div class="inspector">
+            <div class="inspector-head">
+              <div class="seoian-big" id="inspectorSeoian">—</div>
+              <label class="toggle">
+                <input type="checkbox" id="toggleGregorian" />
+                <span>Show Gregorian</span>
+              </label>
+              <div class="gregorian-small" id="inspectorGregorian" hidden>—</div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Active periods</div>
+              <div class="list" id="inspectorPeriods">
+                <div class="muted">Hover/tap a day.</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">SuperDay facts (snapshot)</div>
+              <div class="facts" id="inspectorFacts">
+                <div class="muted">Hover/tap a day.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="center">
+        <div class="cal-header">
+          <div class="nav">
+            <button class="btn" id="btnToday">Today</button>
+            <button class="iconbtn" id="btnPrev" aria-label="Previous">‹</button>
+            <button class="iconbtn" id="btnNext" aria-label="Next">›</button>
+            <div class="title" id="calTitle">—</div>
+          </div>
+
+          <div class="controls">
+            <div class="control">
+              <label>View</label>
+              <select id="viewSelect">
+                <option value="month">Month</option>
+                <option value="week">Week</option>
+                <option value="list">List</option>
+              </select>
+            </div>
+
+            <div class="control jump">
+              <label>Jump</label>
+              <div class="jump-row">
+                <select id="jumpMode">
+                  <option value="seoian" selected>Seoian</option>
+                  <option value="gregorian">Gregorian</option>
+                </select>
+                <input id="jumpInput" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" />
+                <button class="btn" id="btnJump">Go</button>
+              </div>
+            </div>
+
+            <div class="control">
+              <label>Display TZ</label>
+              <select id="displayTZ"></select>
+            </div>
+
+            <div class="control">
+              <button class="btn" id="btnFilters">Filters ▾</button>
+              <div class="dropdown" id="filtersDropdown" hidden>
+                <label class="chk">
+                  <input type="checkbox" id="filterSupermonths" checked />
+                  <span>SuperMonths</span>
+                </label>
+                <div class="muted small">More layers later.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cal-surface" id="calSurface">
+          <!-- injected -->
+        </div>
+      </section>
+
+      <aside class="panel right" id="rightPanel">
+        <div class="panel-inner clocks">
+          <div class="clock-block">
+            <label class="tzlabel">Tamara TZ</label>
+            <input class="tzinput" id="tzTamara" list="tzList" value="America/Phoenix" />
+            <div class="clockface" id="clockTamara"></div>
+          </div>
+
+          <div class="clock-block superday">
+            <div class="superday-title">SuperDay (now)</div>
+            <div class="clockface" id="clockSuperday"></div>
+            <div class="superday-meta">
+              <div><span class="muted">SuperDay:</span> <span id="sdTotal">—</span></div>
+              <div><span class="muted">Elapsed:</span> <span id="sdElapsed">—</span></div>
+            </div>
+          </div>
+
+          <div class="clock-block">
+            <label class="tzlabel">Martin TZ</label>
+            <input class="tzinput" id="tzMartin" list="tzList" value="Australia/Brisbane" />
+            <div class="clockface" id="clockMartin"></div>
+          </div>
+
+          <datalist id="tzList"></datalist>
+        </div>
+      </aside>
+
+      <!-- Mobile bottom sheet -->
+      <div class="bottom-sheet" id="bottomSheet">
+        <div class="sheet-handle" id="sheetHandle">
+          <div class="sheet-handle-text" id="sheetHandleText">Tap a day</div>
+          <div class="sheet-handle-icon">▴</div>
+        </div>
+        <div class="sheet-tabs">
+          <button class="tab active" data-tab="inspector">Inspector</button>
+          <button class="tab" data-tab="clocks">Clocks</button>
+        </div>
+        <div class="sheet-body">
+          <div class="sheet-pane active" id="sheetInspector"></div>
+          <div class="sheet-pane" id="sheetClocks"></div>
+        </div>
+      </div>
+
+      <!-- Popover for +more -->
+      <div class="popover" id="morePopover" hidden></div>
+    </main>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
