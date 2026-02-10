@@ -238,6 +238,13 @@ body{
   background: var(--accent-soft);
 }
 
+.day.outside{
+  background:#fafafb;
+  opacity:0.72;
+}
+.day.outside .sd{ color: var(--muted); }
+
+
 /* Inspector */
 .seoian-big{
   font-family:var(--mono);
