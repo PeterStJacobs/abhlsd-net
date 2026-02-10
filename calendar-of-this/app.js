@@ -66,6 +66,8 @@ function dateISOFromDMY(dmy){
 
 function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 
+function roundHalfUp(x){ return Math.floor(x + 0.5); }
+
 function isSameOffsetZone(aZone, bZone, dateISO){
   const a = DateTime.fromISO(dateISO, {zone:aZone}).startOf('day');
   const b = DateTime.fromISO(dateISO, {zone:bZone}).startOf('day');
@@ -123,6 +125,11 @@ function activeSuperMonths(dateISO){
   const sy = seoianYearForGregorian(dateISO);
   const arr = state.data.rangesBySeoYear.get(sy) || [];
   return arr.filter(r => r.start <= dateISO && dateISO <= r.end);
+}
+
+function getRangeForMonth(seoYear, monthNo){
+  const arr = state.data.rangesBySeoYear.get(seoYear) || [];
+  return arr.find(x => x.monthNo === monthNo) || null;
 }
 
 function canonicalSeoianDate(dateISO){
@@ -183,7 +190,16 @@ function setUpTZList(){
 }
 
 function render(){
-  el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
+  if(state.view === 'month'){
+    const seo = canonicalSeoianDate(state.focusDateISO);
+    if(seo.canonical){
+      el('calTitle').textContent = `${seo.canonical.monthName}, ${String(seo.year).padStart(4,'0')}`;
+    }else{
+      el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
+    }
+  }else{
+    el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
+  }
   renderCenter();
   renderInspector(); // snapshot display only, no recompute
   renderMobileSheetMirrors();
@@ -211,8 +227,11 @@ function renderMonthView(){
   wrap.appendChild(dow);
 
   const dt = DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ});
-  const start = startOfWeekSunday(dt.startOf('month')); // Sunday-start (forced)
-  const end = endOfWeekSaturday(dt.endOf('month'));
+  const monthSeo = canonicalSeoianDate(state.focusDateISO);
+  const rangeStartISO = monthSeo.canonical ? monthSeo.canonical.start : dt.startOf('month').toISODate();
+  const rangeEndISO = monthSeo.canonical ? monthSeo.canonical.end : dt.endOf('month').toISODate();
+  const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
+  const end = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
   let cursor = start;
 
   while(cursor <= end){
@@ -263,6 +282,11 @@ function renderMonthView(){
       const todayISO = DateTime.now().setZone(state.displayTZ).toISODate();
       if(dateISO === todayISO) day.classList.add('today');
       if(state.highlightDateISO && dateISO === state.highlightDateISO) day.classList.add('highlight');
+      // De-emphasize days outside the current SuperMonth range (when Month view is SuperMonth-based)
+      if(monthSeo.canonical){
+        const inRange = (dateISO >= rangeStartISO && dateISO <= rangeEndISO);
+        if(!inRange) day.classList.add('outside');
+      }
 
       const seo = canonicalSeoianDate(dateISO);
       const sd = document.createElement('div');
@@ -576,8 +600,8 @@ function renderInspector(){
   const f = el('inspectorFacts');
   f.innerHTML = '';
   const rows = [
-    ['East TZ', snap.facts.east],
-    ['West TZ', snap.facts.west],
+    ['Eastern TZ', snap.facts.east],
+    ['Western TZ', snap.facts.west],
     ['Start', snap.facts.start],
     ['End', snap.facts.end],
     ['Length', snap.facts.length],
@@ -653,7 +677,7 @@ window.addEventListener('click', (e)=>{
 });
 
 // ---------- Clocks (SVG) ----------
-function makeClockSVG(){
+function makeClockSVG(kind='normal'){
   const ns='http://www.w3.org/2000/svg';
   const svg=document.createElementNS(ns,'svg');
   svg.setAttribute('viewBox','0 0 200 200');
@@ -682,6 +706,34 @@ function makeClockSVG(){
     tick.setAttribute('stroke', (i%5===0)?'#cfd3da':'#e6e7ea');
     tick.setAttribute('stroke-width', (i%5===0)?2:1);
     svg.appendChild(tick);
+  }
+
+  // numeral helpers
+  function addText(id, txt, x, y){
+    const t=document.createElementNS(ns,'text');
+    t.setAttribute('x', x);
+    t.setAttribute('y', y);
+    t.setAttribute('text-anchor','middle');
+    t.setAttribute('dominant-baseline','middle');
+    t.setAttribute('font-family','ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace');
+    t.setAttribute('font-size','14');
+    t.setAttribute('fill','#5c6470');
+    t.id = id;
+    t.textContent = txt;
+    svg.appendChild(t);
+  }
+
+  if(kind === 'normal'){
+    addText('n12','12',100,34);
+    addText('n3','3',166,102);
+    addText('n6','6',100,170);
+    addText('n9','9',34,102);
+  }else if(kind === 'superday'){
+    // placeholders updated at runtime based on N-hour SuperDay
+    addText('n12','0',100,34);
+    addText('n3','',166,102);
+    addText('n6','',100,170);
+    addText('n9','',34,102);
   }
 
   const hour=document.createElementNS(ns,'line');
@@ -724,14 +776,21 @@ function rotate(el, deg){
 }
 
 function mountClocks(){
-  for(const id of ['clockTamara','clockMartin','clockSuperday']){
-    const host = el(id);
-    host.innerHTML='';
-    host.appendChild(makeClockSVG());
-  }
+  const hostT = el('clockTamara');
+  hostT.innerHTML='';
+  hostT.appendChild(makeClockSVG('normal'));
+
+  const hostM = el('clockMartin');
+  hostM.innerHTML='';
+  hostM.appendChild(makeClockSVG('normal'));
+
+  const hostS = el('clockSuperday');
+  hostS.innerHTML='';
+  hostS.appendChild(makeClockSVG('superday'));
 }
 
 function tickClocks(){
+  ensureEastWestOrder();
   const now = DateTime.now();
 
   // Top/bottom
@@ -754,6 +813,25 @@ function tickClocks(){
 
   el('sdTotal').textContent = durationToHHMM(durMs);
   el('sdElapsed').textContent = durationToHHMM(elapsedMs);
+
+
+  // Update SuperDay dial numerals as an N-hour clock face (cardinal points)
+  const nHours = Math.max(1, roundHalfUp(durMs / 3600000));
+  const q1 = roundHalfUp(nHours / 4);
+  const q2 = roundHalfUp(nHours / 2);
+  const q3 = roundHalfUp(3 * nHours / 4);
+
+  const svgS = el('clockSuperday').querySelector('svg');
+  if(svgS){
+    const t12 = svgS.querySelector('#n12');
+    const t3 = svgS.querySelector('#n3');
+    const t6 = svgS.querySelector('#n6');
+    const t9 = svgS.querySelector('#n9');
+    if(t12) t12.textContent = '0';
+    if(t3) t3.textContent = String(q1);
+    if(t6) t6.textContent = String(q2);
+    if(t9) t9.textContent = String(q3);
+  }
 
   // Superday dial: one rotation per SuperDay
   const frac = (durMs===0)?0:(elapsedMs/durMs);
@@ -791,6 +869,29 @@ function updateAnalog(hostId, dt){
   rotate(s, sAngle);
 }
 
+function ensureEastWestOrder(){
+  // Ensure state.tamaraTZ is the more easterly (higher UTC offset) at the current instant.
+  // This keeps the top clock as Eastern TZ and the bottom clock as Western TZ.
+  const now = DateTime.now();
+  const a = now.setZone(state.tamaraTZ);
+  const b = now.setZone(state.martinTZ);
+  if(a.offset === b.offset) return; // treat as same
+  if(a.offset < b.offset){
+    // swap
+    const tmp = state.tamaraTZ;
+    state.tamaraTZ = state.martinTZ;
+    state.martinTZ = tmp;
+    // reflect swap in inputs if they exist
+    const iA = el('tzTamara');
+    const iB = el('tzMartin');
+    if(iA && iB){
+      const t = iA.value;
+      iA.value = iB.value;
+      iB.value = t;
+    }
+  }
+}
+
 // ---------- Controls ----------
 function bindControls(){
   el('viewSelect').addEventListener('change', (e)=>{
@@ -805,19 +906,35 @@ function bindControls(){
   });
 
   el('btnPrev').addEventListener('click', ()=>{
+    if(state.view === 'month'){
+      const seo = canonicalSeoianDate(state.focusDateISO);
+      if(seo.canonical){
+        let y = seo.year;
+        let m = seo.canonical.monthNo - 1;
+        if(m < 1){ m = 13; y = y - 1; }
+        const r = getRangeForMonth(y, m);
+        if(r){ state.focusDateISO = r.start; render(); return; }
+      }
+    }
     const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
-    const next = (state.view === 'month') ? dt.minus({months:1}) :
-                 (state.view === 'week') ? dt.minus({weeks:1}) :
-                 dt.minus({days:30});
+    const next = (state.view === 'week') ? dt.minus({weeks:1}) : dt.minus({days:30});
     state.focusDateISO = next.toISODate();
     render();
   });
 
   el('btnNext').addEventListener('click', ()=>{
+    if(state.view === 'month'){
+      const seo = canonicalSeoianDate(state.focusDateISO);
+      if(seo.canonical){
+        let y = seo.year;
+        let m = seo.canonical.monthNo + 1;
+        if(m > 13){ m = 1; y = y + 1; }
+        const r = getRangeForMonth(y, m);
+        if(r){ state.focusDateISO = r.start; render(); return; }
+      }
+    }
     const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
-    const next = (state.view === 'month') ? dt.plus({months:1}) :
-                 (state.view === 'week') ? dt.plus({weeks:1}) :
-                 dt.plus({days:30});
+    const next = (state.view === 'week') ? dt.plus({weeks:1}) : dt.plus({days:30});
     state.focusDateISO = next.toISODate();
     render();
   });
@@ -890,9 +1007,11 @@ function bindControls(){
   // Timezone inputs
   el('tzTamara').addEventListener('change', (e)=>{
     state.tamaraTZ = e.target.value || DEFAULTS.tamaraTZ;
+    ensureEastWestOrder();
   });
   el('tzMartin').addEventListener('change', (e)=>{
     state.martinTZ = e.target.value || DEFAULTS.martinTZ;
+    ensureEastWestOrder();
   });
 
   // Bottom sheet
@@ -928,6 +1047,7 @@ async function loadData(){
   setUpTZList();
   bindControls();
   await loadData();
+  ensureEastWestOrder();
   mountClocks();
   // Default snapshot = Today
   snapshotDay(DateTime.now().setZone(state.displayTZ).toISODate());
