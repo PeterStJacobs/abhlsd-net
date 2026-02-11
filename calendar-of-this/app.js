@@ -28,7 +28,7 @@ const state = {
   view: 'month',
   displayTZ: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   focusDateISO: DateTime.now().toISODate(), // date label used for navigation
-  filters: { superMonths: true },
+  filters: { superMonths: true, specialDays: true },
   tamaraTZ: DEFAULTS.tamaraTZ,
   martinTZ: DEFAULTS.martinTZ,
   snapshot: null, // {dateISO, seoianLabel, gregorianLabel, periods[], facts{...}, tzAtSnapshot{...}}
@@ -39,10 +39,71 @@ const state = {
     rangesBySeoYear: null,
     monthNoByName: null,
     nameByMonthNo: null,
+    specialDays: null,
+    specialByKey: null,
   }
 };
 
 // ---------- Utilities ----------
+
+function parseCSV(text){
+  // Minimal RFC4180-ish parser (handles quoted fields and commas)
+  const rows = [];
+  let row = [];
+  let cur = '';
+  let inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const ch = text[i];
+    const next = text[i+1];
+    if(inQuotes){
+      if(ch === '"' && next === '"'){ cur += '"'; i++; continue; }
+      if(ch === '"'){ inQuotes = false; continue; }
+      cur += ch;
+      continue;
+    }
+    if(ch === '"'){ inQuotes = true; continue; }
+    if(ch === ','){ row.push(cur); cur=''; continue; }
+    if(ch === '\r'){
+      if(next === '\n'){ i++; }
+      row.push(cur); cur='';
+      if(row.length>1 || row[0]!=='' ) rows.push(row);
+      row=[];
+      continue;
+    }
+    if(ch === '\n'){
+      row.push(cur); cur='';
+      if(row.length>1 || row[0]!=='' ) rows.push(row);
+      row=[];
+      continue;
+    }
+    cur += ch;
+  }
+  // flush
+  row.push(cur);
+  if(row.length>1 || row[0]!=='' ) rows.push(row);
+  if(rows.length===0) return [];
+  const headers = rows[0].map(h=>h.trim());
+  const out = [];
+  for(let r=1;r<rows.length;r++){
+    if(rows[r].every(v=>String(v).trim()==='')) continue;
+    const obj = {};
+    for(let c=0;c<headers.length;c++){
+      obj[headers[c]] = (rows[r][c] ?? '').trim();
+    }
+    out.push(obj);
+  }
+  return out;
+}
+function toBool(v){
+  if(typeof v === 'boolean') return v;
+  const s = String(v).trim().toLowerCase();
+  return (s==='true' || s==='1' || s==='yes' || s==='y');
+}
+function toInt(v, def=null){
+  const n = parseInt(String(v).trim(),10);
+  return Number.isFinite(n) ? n : def;
+}
+
 function pad2(n){ return String(n).padStart(2,'0'); }
 function fmtGreg(dateISO){
   const [y,m,d]=dateISO.split('-').map(Number);
@@ -276,12 +337,12 @@ function renderMonthView(){
     const weekStartISO = weekStart.setZone(state.displayTZ).toISODate();
     const weekEndISO = weekStart.plus({days:6}).setZone(state.displayTZ).toISODate();
 
-    const events = state.filters.superMonths ? collectEventsForRange(weekStartISO, weekEndISO) : [];
+    const events = collectEventsForRange(weekStartISO, weekEndISO);
     const { placed, hiddenByDay } = placeEventsInWeek(events, weekStartISO, weekEndISO, 3);
 
     for(const p of placed){
       const bar = document.createElement('div');
-      bar.className = 'bar' + (p.lane === 1 ? ' secondary' : '');
+      bar.className = (p.kind === 'special') ? 'bar special' : ('bar' + (p.lane === 1 ? ' secondary' : ''));
       bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
       bar.style.gridRow = `${p.lane+1}`;
       bar.textContent = p.label;
@@ -402,11 +463,11 @@ function renderWeekView(){
   // All-day bars (SuperMonths)
   const barsEl = document.createElement('div');
   barsEl.className = 'week-bars';
-  const events = state.filters.superMonths ? collectEventsForRange(weekStartISO, weekEndISO) : [];
+  const events = collectEventsForRange(weekStartISO, weekEndISO);
   const { placed } = placeEventsInWeek(events, weekStartISO, weekEndISO, 5);
   for(const p of placed){
     const bar = document.createElement('div');
-    bar.className = 'bar' + (p.lane === 1 ? ' secondary' : '');
+    bar.className = (p.kind === 'special') ? 'bar special' : ('bar' + (p.lane === 1 ? ' secondary' : ''));
     bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
     bar.style.gridRow = `${p.lane+1}`;
     bar.textContent = p.label;
@@ -456,6 +517,7 @@ function renderListView(){
     const d = start.plus({days:i});
     const dateISO = d.toISODate();
     const seo = canonicalSeoianDate(dateISO);
+    const special = state.filters.specialDays ? specialDaysForDate(dateISO).filter(s=>s.showOnCalendar) : [];
     const active = state.filters.superMonths ? activeSuperMonths(dateISO) : [];
 
     const card = document.createElement('div');
@@ -490,12 +552,21 @@ function renderListView(){
     items.style.flexDirection='column';
     items.style.gap='6px';
 
-    if(active.length===0){
+    if((special.length===0) && (active.length===0)){
       const row = document.createElement('div');
       row.className='muted small';
       row.textContent='(no periods)';
       items.appendChild(row);
     }else{
+      // Special Days first
+      for(const s of special){
+        const row = document.createElement('div');
+        row.textContent = s.title;
+        row.style.fontSize='13px';
+        row.style.fontWeight='600';
+        items.appendChild(row);
+      }
+      // Then SuperMonths
       for(const a of active.sort((x,y)=>x.monthNo-y.monthNo)){
         const row = document.createElement('div');
         row.textContent = a.monthName;
@@ -518,27 +589,80 @@ function renderListView(){
 }
 
 // ---------- Events for spanning bars ----------
-function collectEventsForRange(rangeStartISO, rangeEndISO){
-  const syStart = seoianYearForGregorian(rangeStartISO);
-  const syEnd = seoianYearForGregorian(rangeEndISO);
-  const years = new Set([syStart, syEnd]);
-  const events = [];
-  for(const y of years){
-    const arr = state.data.rangesBySeoYear.get(y) || [];
-    for(const r of arr){
-      // overlap test
-      if(r.end < rangeStartISO || r.start > rangeEndISO) continue;
-      events.push({
-        id: `${r.seoianYear}-${r.monthNo}`,
-        label: r.monthName,
-        start: r.start,
-        end: r.end,
-        monthNo: r.monthNo
+
+function specialDaysForDate(dateISO){
+  if(!state.data.specialByKey) return [];
+  const seo = canonicalSeoianDate(dateISO);
+  if(!seo.monthNo || !seo.day) return [];
+  const key = `${seo.monthNo}-${seo.day}`;
+  const arr = state.data.specialByKey.get(key) || [];
+  const sy = seo.year;
+  return arr.filter(s => sy >= (s.syStartYear || 1));
+}
+
+function collectSpecialDayEventsForRange(rangeStartISO, rangeEndISO){
+  if(!state.filters.specialDays) return [];
+  const start = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
+  const end = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).startOf('day');
+  const days = Math.round(end.diff(start,'days').days);
+  const out = [];
+  for(let i=0;i<=days;i++){
+    const dateISO = start.plus({days:i}).toISODate();
+    const seo = canonicalSeoianDate(dateISO);
+    const hits = specialDaysForDate(dateISO);
+    for(const s of hits){
+      if(!s.showOnCalendar) continue;
+      // occurrence id includes year for uniqueness across repeats
+      out.push({
+        id: `${s.id}_${String(seo.year).padStart(4,'0')}`,
+        label: s.title,
+        start: dateISO,
+        end: dateISO,
+        kind: 'special',
+        rank: 0,
+        sequence: s.sequence ?? 9999
       });
     }
   }
-  // stable sort by start then duration
-  events.sort((a,b)=> a.start.localeCompare(b.start) || (b.end.localeCompare(a.end)));
+  return out;
+}
+
+function collectEventsForRange(rangeStartISO, rangeEndISO){
+  const events = [];
+
+  // Special Days first
+  events.push(...collectSpecialDayEventsForRange(rangeStartISO, rangeEndISO));
+
+  // SuperMonths (spanning)
+  if(state.filters.superMonths){
+    const syStart = seoianYearForGregorian(rangeStartISO);
+    const syEnd = seoianYearForGregorian(rangeEndISO);
+    const years = new Set([syStart, syEnd]);
+    for(const y of years){
+      const arr = state.data.rangesBySeoYear.get(y) || [];
+      for(const r of arr){
+        if(r.end < rangeStartISO || r.start > rangeEndISO) continue;
+        events.push({
+          id: `${r.seoianYear}-${r.monthNo}`,
+          label: r.monthName,
+          start: r.start,
+          end: r.end,
+          monthNo: r.monthNo,
+          kind: 'supermonth',
+          rank: 1,
+          sequence: r.monthNo
+        });
+      }
+    }
+  }
+
+  // stable sort: rank → start → duration → sequence
+  events.sort((a,b)=>
+    (a.rank??9)-(b.rank??9) ||
+    a.start.localeCompare(b.start) ||
+    b.end.localeCompare(a.end) ||
+    (a.sequence??9999)-(b.sequence??9999)
+  );
   return events;
 }
 
@@ -589,13 +713,15 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 // ---------- Snapshot: Day Inspector ----------
 function snapshotDay(dateISO){
   const seo = canonicalSeoianDate(dateISO);
-  const periods = activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName);
+  const specialDays = state.filters.specialDays ? specialDaysForDate(dateISO).filter(s=>s.showInInspector) : [];
+  const periods = state.filters.superMonths ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName) : [];
   const facts = superDayBounds(dateISO, state.tamaraTZ, state.martinTZ);
 
   state.snapshot = {
     dateISO,
     seoianLabel: seo.label,
     gregorianLabel: fmtGreg(dateISO),
+    specialDays,
     periods,
     facts: {
       east: facts.east,
@@ -630,17 +756,47 @@ function renderInspector(){
   el('inspectorGregorian').textContent = snap.gregorianLabel;
 
   // periods
+
+  // periods + special days
   const p = el('inspectorPeriods');
   p.innerHTML = '';
-  if(snap.periods.length === 0){
-    p.innerHTML = '<div class="muted">(no periods)</div>';
-  }else{
+
+  const specials = (snap.specialDays || []);
+  let any = false;
+
+  // Special Days first
+  if(specials.length > 0){
+    any = true;
+    for(const s of specials.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title))){
+      const div = document.createElement('div');
+      div.className = 'eventitem';
+      const t = document.createElement('div');
+      t.className = 'title';
+      t.textContent = s.title;
+      div.appendChild(t);
+      if(s.notes){
+        const n = document.createElement('div');
+        n.className = 'note';
+        n.textContent = s.notes;
+        div.appendChild(n);
+      }
+      p.appendChild(div);
+    }
+  }
+
+  // SuperMonth periods next
+  if(snap.periods.length > 0){
+    any = true;
     for(const item of snap.periods){
       const div = document.createElement('div');
       div.className = 'pill';
       div.textContent = item;
       p.appendChild(div);
     }
+  }
+
+  if(!any){
+    p.innerHTML = '<div class="muted">(no periods)</div>';
   }
 
   // facts
@@ -700,7 +856,15 @@ function openMorePopover(x,y,dateISO){
   close.addEventListener('click', ()=>{ pop.hidden=true; });
   pop.appendChild(close);
 
-  const items = activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo);
+  const special = state.filters.specialDays ? specialDaysForDate(dateISO).filter(s=>s.showOnCalendar) : [];
+  for(const s of special){
+    const div = document.createElement('div');
+    div.className='pop-item';
+    div.textContent = s.title;
+    pop.appendChild(div);
+  }
+
+  const items = state.filters.superMonths ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo) : [];
   for(const it of items){
     const div = document.createElement('div');
     div.className='pop-item';
@@ -1030,6 +1194,13 @@ function bindControls(){
     state.filters.superMonths = e.target.checked;
     render();
   });
+  el('filterSupermonths').checked = state.filters.superMonths;
+
+  el('filterSpecialDays').addEventListener('change', (e)=>{
+    state.filters.specialDays = e.target.checked;
+    render();
+  });
+  el('filterSpecialDays').checked = state.filters.specialDays;
 
   // Jump input: auto slashes
   el('jumpInput').addEventListener('input', (e)=>{
@@ -1101,12 +1272,53 @@ function bindControls(){
 async function loadData(){
   const cfgRes = await fetch('./data/supermonths_config.json');
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
+  const specialRes = await fetch('./data/AFdS_Special_Days.csv');
   state.data.config = await cfgRes.json();
   state.data.ranges = await rangesRes.json();
   const idx = buildRangesIndex(state.data.ranges);
   state.data.rangesBySeoYear = idx.byYear;
   state.data.monthNoByName = idx.monthNoByName;
   state.data.nameByMonthNo = idx.nameByMonthNo;
+
+  // Special Days (Set 1)
+  const csvText = await specialRes.text();
+  const raw = parseCSV(csvText);
+  const specials = [];
+  for(const r of raw){
+    // tolerate slight header variations (older files)
+    const id = r.ID || r.id || '';
+    const title = r.Title || r.title || '';
+    if(!id || !title) continue;
+    specials.push({
+      id,
+      sequence: toInt(r.Sequence ?? r.sequence, 9999),
+      title,
+      notes: r.Notes || r.notes || '',
+      allDay: toBool(r.All_Day ?? r.all_day ?? true),
+      anchorType: (r.Anchor_Type || r.anchor_type || 'SY').toUpperCase(),
+      syMonth: toInt(r.SY_Month ?? r.sy_month, null),
+      syDay: toInt(r.SY_Day ?? r.sy_day, null),
+      syStartYear: toInt(r.SY_Start_Year ?? r.sy_year_start, 1),
+      category: (r.Category || r.category || 'Special'),
+      rank: toInt(r.Rank ?? r.rank, 1),
+      showOnCalendar: toBool(r.ShowOnCalendar ?? true),
+      showInInspector: toBool(r.ShowInInspector ?? true),
+      showNotesOnCalendar: toBool(r.ShowNotesOnCalendar ?? false),
+    });
+  }
+  // index by SY month-day
+  const byKey = new Map();
+  for(const s of specials){
+    if(!s.syMonth || !s.syDay) continue;
+    const key = `${s.syMonth}-${s.syDay}`;
+    if(!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(s);
+  }
+  for(const [k,arr] of byKey.entries()){
+    arr.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+  }
+  state.data.specialDays = specials;
+  state.data.specialByKey = byKey;
 }
 
 (async function init(){
