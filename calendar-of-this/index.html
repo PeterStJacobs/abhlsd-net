@@ -106,8 +106,9 @@
         <div class="panel-inner clocks">
           <div class="clock-block">
             <label class="tzlabel">Eastern TZ</label>
-            <input class="tzinput" id="tzTamara" list="tzList" value="America/Phoenix" />
+            <select class="tzselect" id="tzTamara"></select>
             <div class="clockface" id="clockTamara"></div>
+            <div class="ampm" id="ampmEast">—</div>
           </div>
 
           <div class="clock-block superday">
@@ -121,12 +122,11 @@
 
           <div class="clock-block">
             <label class="tzlabel">Western TZ</label>
-            <input class="tzinput" id="tzMartin" list="tzList" value="Australia/Brisbane" />
+            <select class="tzselect" id="tzMartin"></select>
             <div class="clockface" id="clockMartin"></div>
+            <div class="ampm" id="ampmWest">—</div>
           </div>
-
-          <datalist id="tzList"></datalist>
-        </div>
+</div>
       </aside>
 
       <!-- Mobile bottom sheet -->
