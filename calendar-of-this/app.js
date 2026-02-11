@@ -97,6 +97,18 @@ function durationToHHMM(ms){
   return `${h}:${pad2(m)}`;
 }
 
+function ceilToHalfHourHours(hours){
+  return Math.ceil(hours*2)/2;
+}
+
+function durationToHHMMCeilHalfHour(ms){
+  const totalMin = ms/60000;
+  const roundedMin = Math.ceil(totalMin/30)*30;
+  const h = Math.floor(roundedMin/60);
+  const m = roundedMin%60;
+  return `${h}:${pad2(m)}`;
+}
+
 function monthTitle(dateISO, displayTZ){
   const dt = DateTime.fromISO(dateISO, {zone:displayTZ});
   return dt.toFormat('LLLL yyyy');
@@ -163,8 +175,6 @@ function gregorianFromSeoian(dd, mm, yyyy){
 const el = (id)=>document.getElementById(id);
 
 function setUpTZList(){
-  const listEl = el('tzList');
-  listEl.innerHTML = '';
   let zones = [];
   try{
     zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
@@ -172,11 +182,27 @@ function setUpTZList(){
   if(!zones || zones.length === 0){
     zones = [DEFAULTS.tamaraTZ, DEFAULTS.martinTZ, 'America/Toronto', 'UTC', 'Europe/London', 'Asia/Tokyo'];
   }
-  for(const z of zones){
-    const opt = document.createElement('option');
-    opt.value = z;
-    listEl.appendChild(opt);
-  }
+
+  const fillSelect = (sel, currentVal)=>{
+    if(!sel) return;
+    sel.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    for(const z of zones){
+      const opt = document.createElement('option');
+      opt.value = z;
+      opt.textContent = z;
+      frag.appendChild(opt);
+    }
+    sel.appendChild(frag);
+    sel.value = currentVal;
+    if(!sel.value){
+      sel.value = zones.includes(DEFAULTS.tamaraTZ) ? DEFAULTS.tamaraTZ : zones[0];
+    }
+  };
+
+  fillSelect(el('tzTamara'), state.tamaraTZ);
+  fillSelect(el('tzMartin'), state.martinTZ);
+
   // Display TZ selector
   const displaySel = el('displayTZ');
   displaySel.innerHTML = '';
@@ -187,16 +213,15 @@ function setUpTZList(){
     if(z === state.displayTZ) opt.selected = true;
     displaySel.appendChild(opt);
   }
+
+  // enforce East/West order in UI after population
+  ensureEastWestOrder();
 }
 
 function render(){
-  if(state.view === 'month'){
-    const seo = canonicalSeoianDate(state.focusDateISO);
-    if(seo.canonical){
-      el('calTitle').textContent = `${seo.canonical.monthName}, ${String(seo.year).padStart(4,'0')}`;
-    }else{
-      el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
-    }
+  const seo = canonicalSeoianDate(state.focusDateISO);
+  if(seo.canonical){
+    el('calTitle').textContent = `${seo.canonical.monthName}, ${String(seo.year).padStart(4,'0')}`;
   }else{
     el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
   }
@@ -335,22 +360,46 @@ function renderMonthView(){
 
 function renderWeekView(){
   const wrap = document.createElement('div');
-  wrap.className = 'month';
+  wrap.className = 'week';
 
-  const dow = document.createElement('div');
-  dow.className = 'dow';
   const dt = startOfWeekSunday(DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ}));
+
+  // Header aligned to time grid
+  const header = document.createElement('div');
+  header.className = 'week-dow';
+  const spacer = document.createElement('div');
+  spacer.className = 'week-dow-spacer';
+  header.appendChild(spacer);
+
+  const showGreg = el('toggleGregorian').checked;
   for(let i=0;i<7;i++){
     const d = dt.plus({days:i});
+    const dateISO = d.toISODate();
+    const seo = canonicalSeoianDate(dateISO);
+
     const cell = document.createElement('div');
-    cell.textContent = `${DOW[i]} ${d.toFormat('d/L')}`;
-    dow.appendChild(cell);
+    cell.className = 'week-dow-cell';
+
+    const main = document.createElement('div');
+    main.className = 'week-dow-main';
+    main.textContent = seo.canonical ? `${DOW[i]} ${seo.label}` : `${DOW[i]}`;
+    cell.appendChild(main);
+
+    if(showGreg){
+      const sub = document.createElement('div');
+      sub.className = 'week-dow-sub';
+      sub.textContent = d.toFormat('d/L/yyyy');
+      cell.appendChild(sub);
+    }
+
+    header.appendChild(cell);
   }
-  wrap.appendChild(dow);
+  wrap.appendChild(header);
 
   const weekStartISO = dt.toISODate();
   const weekEndISO = dt.plus({days:6}).toISODate();
 
+  // All-day bars (SuperMonths)
   const barsEl = document.createElement('div');
   barsEl.className = 'week-bars';
   const events = state.filters.superMonths ? collectEventsForRange(weekStartISO, weekEndISO) : [];
@@ -365,30 +414,28 @@ function renderWeekView(){
   }
   wrap.appendChild(barsEl);
 
-  // simple time grid scaffold
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = '70px repeat(7, 1fr)';
-  grid.style.borderTop = '1px solid var(--line)';
-  grid.style.minHeight = '480px';
+  // Time grid: 00:00 → 23:00 + SuperDay overflow hours beyond 24 if applicable
+  const bounds = superDayBounds(state.focusDateISO, state.tamaraTZ, state.martinTZ);
+  const durMs = bounds.end.toUTC().toMillis() - bounds.start.toUTC().toMillis();
+  const nHoursRounded = ceilToHalfHourHours(durMs / 3600000);
+  const totalHourRows = Math.max(24, Math.ceil(nHoursRounded));
 
-  for(let h=7; h<=17; h++){
+  const grid = document.createElement('div');
+  grid.className = 'week-grid';
+
+  for(let h=0; h<totalHourRows; h++){
     const lbl = document.createElement('div');
-    lbl.textContent = (h<=11?`${h}am`:(h===12?'12pm':`${h-12}pm`));
-    lbl.style.padding='8px';
-    lbl.style.fontSize='12px';
-    lbl.style.color='var(--muted)';
-    lbl.style.borderRight='1px solid var(--line)';
-    lbl.style.borderBottom='1px solid var(--line)';
+    lbl.className = 'time-label' + (h>=24 ? ' overflow' : '');
+    lbl.textContent = `${String(h).padStart(2,'0')}:00`;
     grid.appendChild(lbl);
 
     for(let d=0; d<7; d++){
       const cell = document.createElement('div');
-      cell.style.borderBottom='1px solid var(--line)';
-      cell.style.borderRight = d===6 ? 'none' : '1px solid var(--line)';
+      cell.className = 'week-cell';
       grid.appendChild(cell);
     }
   }
+
   wrap.appendChild(grid);
   return wrap;
 }
@@ -803,6 +850,12 @@ function tickClocks(){
   updateAnalog('clockTamara', tNow);
   updateAnalog('clockMartin', mNow);
 
+  // AM/PM indicators
+  const ae = el('ampmEast');
+  const aw = el('ampmWest');
+  if(ae) ae.textContent = tNow.toFormat('a');
+  if(aw) aw.textContent = mNow.toFormat('a');
+
   // SuperDay: use date label of today in Display TZ
   const todayISO = now.setZone(state.displayTZ).toISODate();
   const bounds = superDayBounds(todayISO, state.tamaraTZ, state.martinTZ);
@@ -811,12 +864,12 @@ function tickClocks(){
   const durMs = endUTC.toMillis() - startUTC.toMillis();
   const elapsedMs = clamp(now.toUTC().toMillis() - startUTC.toMillis(), 0, durMs);
 
-  el('sdTotal').textContent = durationToHHMM(durMs);
+  el('sdTotal').textContent = durationToHHMMCeilHalfHour(durMs);
   el('sdElapsed').textContent = durationToHHMM(elapsedMs);
 
 
   // Update SuperDay dial numerals as an N-hour clock face (cardinal points)
-  const nHours = Math.max(1, roundHalfUp(durMs / 3600000));
+  const nHours = Math.max(0.5, ceilToHalfHourHours(durMs / 3600000));
   const q1 = roundHalfUp(nHours / 4);
   const q2 = roundHalfUp(nHours / 2);
   const q3 = roundHalfUp(3 * nHours / 4);
@@ -833,19 +886,28 @@ function tickClocks(){
     if(t9) t9.textContent = String(q3);
   }
 
-  // Superday dial: one rotation per SuperDay
+  // SuperDay hands (analog feel without lying to the maths):
+  // - Hour hand: one full rotation per SuperDay
+  // - Minute/second hands: conventional minute/second within the SuperDay hour
   const frac = (durMs===0)?0:(elapsedMs/durMs);
-  const angle = frac * 360;
+  const hourAngle = frac * 360;
 
-  // show as minute hand sweeping; set hour/minute static subtle
+  const totalSec = Math.floor(elapsedMs/1000);
+  const sec = totalSec % 60;
+  const totalMin = Math.floor(totalSec/60);
+  const min = totalMin % 60;
+
+  const minAngle = (min + sec/60) * 6;
+  const secAngle = sec * 6;
+
   const svg = el('clockSuperday').querySelector('svg');
   if(svg){
     const h=svg.querySelector('#h');
     const m=svg.querySelector('#m');
     const s=svg.querySelector('#s');
-    rotate(h, angle * 0.25); // subtle
-    rotate(m, angle);
-    rotate(s, angle);
+    rotate(h, hourAngle);
+    rotate(m, minAngle);
+    rotate(s, secAngle);
   }
 }
 
@@ -896,6 +958,10 @@ function ensureEastWestOrder(){
 function bindControls(){
   el('viewSelect').addEventListener('change', (e)=>{
     state.view = e.target.value;
+    // Reset Jump input to reflect the currently shown date (prevents stale mismatch).
+    const mode = el('jumpMode').value;
+    const seo = canonicalSeoianDate(state.focusDateISO);
+    el('jumpInput').value = (mode === 'gregorian') ? fmtGreg(state.focusDateISO) : (seo.canonical ? seo.label : '');
     render();
   });
 
