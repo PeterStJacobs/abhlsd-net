@@ -247,6 +247,12 @@ body{
   background: rgba(27,107,111,0.12);
   color:#0f3f42;
 }
+.bar.special{
+  background: rgba(120,90,30,0.12);
+  color:#3f2e0d;
+}
+.bar.special:hover{ border-color: rgba(120,90,30,0.25); }
+
 .bar.secondary{
   background: rgba(27,107,111,0.07);
 }
@@ -462,3 +468,8 @@ body{
   .sheet-pane{ display:none; padding:12px; }
   .sheet-pane.active{ display:block; }
 }
+
+.eventitem{ border:1px solid var(--line); border-radius:10px; padding:6px 8px; background:#fff; }
+.eventitem .title{ font-weight:600; font-size:13px; }
+.eventitem .note{ margin-top:2px; font-size:12px; color:var(--muted); }
+.pill.special{ background: rgba(120,90,30,0.10); color:#3f2e0d; border-color: rgba(120,90,30,0.18); }
