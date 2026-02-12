@@ -98,6 +98,11 @@ function toBool(v){
   const s = String(v ?? '').trim().toLowerCase();
   return (s==='true' || s==='1' || s==='yes' || s==='y');
 }
+function toBoolDefault(v, def){
+  const s = String(v ?? '').trim();
+  if(s === '') return def;
+  return toBool(s);
+}
 function toInt(v, def=null){
   const n = parseInt(String(v ?? '').trim(),10);
   return Number.isFinite(n) ? n : def;
@@ -1462,9 +1467,9 @@ async function loadData(){
       category,
       rank,
       sequence: seq,
-      showOnCalendar: toBool(r.ShowOnCalendar ?? true),
-      showInInspector: toBool(r.ShowInInspector ?? true),
-      showNotesOnCalendar: toBool(r.ShowNotesOnCalendar ?? false),
+      showOnCalendar: toBoolDefault(r.ShowOnCalendar ?? true),
+      showInInspector: toBoolDefault(r.ShowInInspector ?? true),
+      showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar ?? false),
 
       // SY anchor
       syMonth: toInt(r.SY_Month ?? r.sy_month, null),
