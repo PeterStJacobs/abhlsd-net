@@ -143,6 +143,14 @@ body{
 }
 
 /* Month grid */
+.month-bars{
+  display:grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 22px;
+  gap:2px 6px;
+  padding:6px 6px 0 6px;
+}
+
 .month{
   display:flex;
   flex-direction:column;
