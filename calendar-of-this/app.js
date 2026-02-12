@@ -28,7 +28,7 @@ const state = {
   view: 'month',
   displayTZ: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   focusDateISO: DateTime.now().toISODate(), // date label used for navigation
-  filters: { superMonths: true, specialDays: true },
+  filters: { superMonths: true, specialDays: true, standardDays: true },
   tamaraTZ: DEFAULTS.tamaraTZ,
   martinTZ: DEFAULTS.martinTZ,
   snapshot: null, // {dateISO, seoianLabel, gregorianLabel, periods[], facts{...}, tzAtSnapshot{...}}
@@ -39,8 +39,8 @@ const state = {
     rangesBySeoYear: null,
     monthNoByName: null,
     nameByMonthNo: null,
-    specialDays: null,
-    specialByKey: null,
+    syByKey: null,
+    gyDefs: null,
   }
 };
 
@@ -64,7 +64,7 @@ function parseCSV(text){
     if(ch === '"'){ inQuotes = true; continue; }
     if(ch === ','){ row.push(cur); cur=''; continue; }
     if(ch === '\r'){
-      if(next === '\n'){ i++; }
+      if(next === '\n') i++;
       row.push(cur); cur='';
       if(row.length>1 || row[0]!=='' ) rows.push(row);
       row=[];
@@ -78,7 +78,6 @@ function parseCSV(text){
     }
     cur += ch;
   }
-  // flush
   row.push(cur);
   if(row.length>1 || row[0]!=='' ) rows.push(row);
   if(rows.length===0) return [];
@@ -96,11 +95,11 @@ function parseCSV(text){
 }
 function toBool(v){
   if(typeof v === 'boolean') return v;
-  const s = String(v).trim().toLowerCase();
+  const s = String(v ?? '').trim().toLowerCase();
   return (s==='true' || s==='1' || s==='yes' || s==='y');
 }
 function toInt(v, def=null){
-  const n = parseInt(String(v).trim(),10);
+  const n = parseInt(String(v ?? '').trim(),10);
   return Number.isFinite(n) ? n : def;
 }
 
@@ -342,8 +341,8 @@ function renderMonthView(){
 
     for(const p of placed){
       const bar = document.createElement('div');
-      bar.className = (p.kind === 'special') ? 'bar special' : ('bar' + (p.lane === 1 ? ' secondary' : ''));
-      bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
+      bar.className = (p.kind === 'special') ? 'bar special' : (p.kind === 'standard' ? 'bar standard' : ('bar' + (p.lane === 1 ? ' secondary' : '')));
+      bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
       bar.style.gridRow = `${p.lane+1}`;
       bar.textContent = p.label;
       bar.title = p.label;
@@ -467,8 +466,8 @@ function renderWeekView(){
   const { placed } = placeEventsInWeek(events, weekStartISO, weekEndISO, 5);
   for(const p of placed){
     const bar = document.createElement('div');
-    bar.className = (p.kind === 'special') ? 'bar special' : ('bar' + (p.lane === 1 ? ' secondary' : ''));
-    bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
+    bar.className = (p.kind === 'special') ? 'bar special' : (p.kind === 'standard' ? 'bar standard' : ('bar' + (p.lane === 1 ? ' secondary' : '')));
+    bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
     bar.style.gridRow = `${p.lane+1}`;
     bar.textContent = p.label;
     barsEl.appendChild(bar);
@@ -484,10 +483,23 @@ function renderWeekView(){
   const grid = document.createElement('div');
   grid.className = 'week-grid';
 
-  for(let h=0; h<totalHourRows; h++){
+  // Week view is always 24 rows. Overflow hours are shown as secondary markers in the gutter.
+  const extraCount = Math.max(0, Math.ceil(nHoursRounded) - 24);
+
+  for(let h=0; h<24; h++){
     const lbl = document.createElement('div');
-    lbl.className = 'time-label' + (h>=24 ? ' overflow' : '');
-    lbl.textContent = `${String(h).padStart(2,'0')}:00`;
+    lbl.className = 'time-label';
+    const primary = document.createElement('span');
+    primary.textContent = `${String(h).padStart(2,'0')}:00`;
+    lbl.appendChild(primary);
+
+    if(h < extraCount){
+      const ov = document.createElement('span');
+      ov.className = 'ov';
+      ov.textContent = `${String(24+h).padStart(2,'0')}:00`;
+      lbl.appendChild(ov);
+    }
+
     grid.appendChild(lbl);
 
     for(let d=0; d<7; d++){
@@ -517,8 +529,10 @@ function renderListView(){
     const d = start.plus({days:i});
     const dateISO = d.toISODate();
     const seo = canonicalSeoianDate(dateISO);
-    const special = state.filters.specialDays ? specialDaysForDate(dateISO).filter(s=>s.showOnCalendar) : [];
     const active = state.filters.superMonths ? activeSuperMonths(dateISO) : [];
+    const syDefs = syEventDefsForDate(dateISO).filter(d=>d.showOnCalendar);
+    const gyDefs = gregorianDefsForDate(dateISO).filter(d=>d.showOnCalendar);
+    const dayDefs = [...syDefs, ...gyDefs].sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
 
     const card = document.createElement('div');
     card.style.border='1px solid var(--line)';
@@ -552,25 +566,25 @@ function renderListView(){
     items.style.flexDirection='column';
     items.style.gap='6px';
 
-    if((special.length===0) && (active.length===0)){
+    if(active.length===0 && dayDefs.length===0){
       const row = document.createElement('div');
       row.className='muted small';
       row.textContent='(no periods)';
       items.appendChild(row);
     }else{
-      // Special Days first
-      for(const s of special){
-        const row = document.createElement('div');
-        row.textContent = s.title;
-        row.style.fontSize='13px';
-        row.style.fontWeight='600';
-        items.appendChild(row);
-      }
-      // Then SuperMonths
+      // SuperMonths first (Priority 0)
       for(const a of active.sort((x,y)=>x.monthNo-y.monthNo)){
         const row = document.createElement('div');
         row.textContent = a.monthName;
         row.style.fontSize='13px';
+        items.appendChild(row);
+      }
+      // Then day events (Special then Standard)
+      for(const d of dayDefs){
+        const row = document.createElement('div');
+        row.textContent = d.title;
+        row.style.fontSize='13px';
+        row.style.fontWeight='600';
         items.appendChild(row);
       }
     }
@@ -590,50 +604,124 @@ function renderListView(){
 
 // ---------- Events for spanning bars ----------
 
-function specialDaysForDate(dateISO){
-  if(!state.data.specialByKey) return [];
+function enabledForCategory(cat){
+  const c = String(cat || '').trim().toLowerCase();
+  if(c === 'special') return state.filters.specialDays;
+  if(c === 'standard') return state.filters.standardDays;
+  // default: show
+  return true;
+}
+
+function syEventDefsForDate(dateISO){
+  if(!state.data.syByKey) return [];
   const seo = canonicalSeoianDate(dateISO);
   if(!seo.monthNo || !seo.day) return [];
   const key = `${seo.monthNo}-${seo.day}`;
-  const arr = state.data.specialByKey.get(key) || [];
-  const sy = seo.year;
-  return arr.filter(s => sy >= (s.syStartYear || 1));
+  const arr = state.data.syByKey.get(key) || [];
+  return arr.filter(d =>
+    enabledForCategory(d.category) &&
+    (seo.year >= (d.syStartYear || 1))
+  );
 }
 
-function collectSpecialDayEventsForRange(rangeStartISO, rangeEndISO){
-  if(!state.filters.specialDays) return [];
-  const start = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
-  const end = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).startOf('day');
-  const days = Math.round(end.diff(start,'days').days);
-  const out = [];
-  for(let i=0;i<=days;i++){
-    const dateISO = start.plus({days:i}).toISODate();
-    const seo = canonicalSeoianDate(dateISO);
-    const hits = specialDaysForDate(dateISO);
-    for(const s of hits){
-      if(!s.showOnCalendar) continue;
-      // occurrence id includes year for uniqueness across repeats
-      out.push({
-        id: `${s.id}_${String(seo.year).padStart(4,'0')}`,
-        label: s.title,
-        start: dateISO,
-        end: dateISO,
-        kind: 'special',
-        rank: 0,
-        sequence: s.sequence ?? 9999
-      });
+function weekdayToLuxon(w){
+  // CSV weekday uses 0=Sun ... 6=Sat. Luxon: 1=Mon ... 7=Sun
+  if(w === null || w === undefined) return null;
+  const n = Number(w);
+  if(!Number.isFinite(n)) return null;
+  if(n === 0) return 7;
+  return n; // 1..6
+}
+
+function easterSundayMonthDay(year){
+  // Meeus/Jones/Butcher algorithm for Gregorian Easter Sunday
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31); // 3=March, 4=April
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return {month, day};
+}
+
+function occurrenceISOForGregorianRule(def, year){
+  if(year < (def.gregStartYear || 0)) return null;
+  const zone = state.displayTZ;
+  const t = def.anchorType;
+
+  if(t === 'GY_FIXED'){
+    if(!def.gyMonth || !def.gyDay) return null;
+    return DateTime.fromObject({year, month:def.gyMonth, day:def.gyDay}, {zone}).toISODate();
+  }
+
+  if(t === 'GY_NTH_DOW'){
+    if(!def.gyMonth || !def.nth || def.weekday===null || def.weekday===undefined) return null;
+    const target = weekdayToLuxon(def.weekday);
+    const first = DateTime.fromObject({year, month:def.gyMonth, day:1}, {zone});
+    const firstW = first.weekday; // 1..7
+    const delta = (target - firstW + 7) % 7;
+    const day = 1 + delta + (def.nth - 1) * 7;
+    const dt = DateTime.fromObject({year, month:def.gyMonth, day}, {zone});
+    if(dt.month !== def.gyMonth) return null;
+    return dt.toISODate();
+  }
+
+  if(t === 'GY_LAST_DOW'){
+    if(!def.gyMonth || def.weekday===null || def.weekday===undefined) return null;
+    const target = weekdayToLuxon(def.weekday);
+    let dt = DateTime.fromObject({year, month:def.gyMonth, day:1}, {zone}).endOf('month').startOf('day');
+    while(dt.weekday !== target){
+      dt = dt.minus({days:1});
     }
+    return dt.toISODate();
+  }
+
+  if(t === 'GY_LAST_DOW_BEFORE_DATE'){
+    if(!def.gyMonth || !def.gyDay || def.weekday===null || def.weekday===undefined) return null;
+    const target = weekdayToLuxon(def.weekday);
+    let dt = DateTime.fromObject({year, month:def.gyMonth, day:def.gyDay}, {zone}).minus({days:1}).startOf('day');
+    while(dt.weekday !== target){
+      dt = dt.minus({days:1});
+    }
+    return dt.toISODate();
+  }
+
+  if(t === 'GY_EASTER'){
+    const {month, day} = easterSundayMonthDay(year);
+    let dt = DateTime.fromObject({year, month, day}, {zone}).startOf('day');
+    const off = Number(def.offsetDays || 0);
+    if(Number.isFinite(off) && off !== 0) dt = dt.plus({days: off});
+    return dt.toISODate();
+  }
+
+  return null;
+}
+
+function gregorianDefsForDate(dateISO){
+  if(!state.data.gyDefs) return [];
+  const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
+  const year = dt.year;
+  const out = [];
+  for(const def of state.data.gyDefs){
+    if(!enabledForCategory(def.category)) continue;
+    const occ = occurrenceISOForGregorianRule(def, year);
+    if(occ === dateISO) out.push(def);
   }
   return out;
 }
 
-function collectEventsForRange(rangeStartISO, rangeEndISO){
+function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   const events = [];
 
-  // Special Days first
-  events.push(...collectSpecialDayEventsForRange(rangeStartISO, rangeEndISO));
-
-  // SuperMonths (spanning)
+  // SuperMonths: Priority 0
   if(state.filters.superMonths){
     const syStart = seoianYearForGregorian(rangeStartISO);
     const syEnd = seoianYearForGregorian(rangeEndISO);
@@ -649,21 +737,71 @@ function collectEventsForRange(rangeStartISO, rangeEndISO){
           end: r.end,
           monthNo: r.monthNo,
           kind: 'supermonth',
-          rank: 1,
+          rank: 0,
           sequence: r.monthNo
         });
       }
     }
   }
 
-  // stable sort: rank → start → duration → sequence
+  // Range days for SY anchored + inspector ordering later
+  const start = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
+  const end = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).startOf('day');
+  const days = Math.round(end.diff(start,'days').days);
+  for(let i=0;i<=days;i++){
+    const dateISO = start.plus({days:i}).toISODate();
+    const seo = canonicalSeoianDate(dateISO);
+
+    // SY anchored defs
+    for(const def of syEventDefsForDate(dateISO)){
+      if(!def.showOnCalendar) continue;
+      events.push({
+        id: `${def.id}_${String(seo.year).padStart(4,'0')}`,
+        label: def.title,
+        start: dateISO,
+        end: dateISO,
+        kind: (String(def.category||'').toLowerCase()==='standard') ? 'standard' : 'special',
+        rank: def.rank ?? 9,
+        sequence: def.sequence ?? 9999
+      });
+    }
+  }
+
+  // Gregorian rules: compute per year in range
+  const startY = start.year;
+  const endY = end.year;
+  for(let y=startY; y<=endY; y++){
+    for(const def of (state.data.gyDefs || [])){
+      if(!def.showOnCalendar) continue;
+      if(!enabledForCategory(def.category)) continue;
+      const occ = occurrenceISOForGregorianRule(def, y);
+      if(!occ) continue;
+      if(occ < rangeStartISO || occ > rangeEndISO) continue;
+      events.push({
+        id: `${def.id}_${String(y).padStart(4,'0')}`,
+        label: def.title,
+        start: occ,
+        end: occ,
+        kind: (String(def.category||'').toLowerCase()==='standard') ? 'standard' : 'special',
+        rank: def.rank ?? 9,
+        sequence: def.sequence ?? 9999
+      });
+    }
+  }
+
+  // Sort by rank (priority) then sequence then start
   events.sort((a,b)=>
     (a.rank??9)-(b.rank??9) ||
+    (a.sequence??9999)-(b.sequence??9999) ||
     a.start.localeCompare(b.start) ||
-    b.end.localeCompare(a.end) ||
-    (a.sequence??9999)-(b.sequence??9999)
+    a.label.localeCompare(b.label)
   );
+
   return events;
+}
+
+function collectEventsForRange(rangeStartISO, rangeEndISO){
+  return collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO);
 }
 
 function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
@@ -713,28 +851,23 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 // ---------- Snapshot: Day Inspector ----------
 function snapshotDay(dateISO){
   const seo = canonicalSeoianDate(dateISO);
-  const specialDays = state.filters.specialDays ? specialDaysForDate(dateISO).filter(s=>s.showInInspector) : [];
   const periods = state.filters.superMonths ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName) : [];
-  const facts = superDayBounds(dateISO, state.tamaraTZ, state.martinTZ);
+  const specialDays = state.filters.specialDays ? syEventDefsForDate(dateISO).filter(d=>String(d.category||'').toLowerCase()==='special' && d.showInInspector) : [];
+  const standardDays = state.filters.standardDays ? (gregorianDefsForDate(dateISO).filter(d=>String(d.category||'').toLowerCase()==='standard' && d.showInInspector)) : [];
 
-  state.snapshot = {
+  const snap = {
     dateISO,
     seoianLabel: seo.label,
     gregorianLabel: fmtGreg(dateISO),
     specialDays,
+    standardDays,
     periods,
-    facts: {
-      east: facts.east,
-      west: facts.west,
-      start: facts.start.toFormat('ccc dd LLL yyyy HH:mm'),
-      end: facts.end.toFormat('ccc dd LLL yyyy HH:mm'),
-      length: durationToHHMM(facts.durMs),
-    },
-    tzAtSnapshot: { tamaraTZ: state.tamaraTZ, martinTZ: state.martinTZ }
+    facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
+    tzAtSnapshot: { eastern: state.tamaraTZ, western: state.martinTZ }
   };
+  state.snapshot = snap;
   state.highlightDateISO = dateISO;
-  // update handle text for mobile
-  el('sheetHandleText').textContent = seo.label === '—' ? '—' : seo.label;
+  renderInspector();
   render();
 }
 
@@ -755,36 +888,35 @@ function renderInspector(){
   el('inspectorSeoian').textContent = snap.seoianLabel;
   el('inspectorGregorian').textContent = snap.gregorianLabel;
 
-  // periods
-
-  // periods + special days
+  // periods + day events
   const p = el('inspectorPeriods');
   p.innerHTML = '';
 
   const specials = (snap.specialDays || []);
+  const standards = (snap.standardDays || []);
   let any = false;
 
-  // Special Days first
-  if(specials.length > 0){
+  const defs = [...specials, ...standards].sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+  if(defs.length > 0){
     any = true;
-    for(const s of specials.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title))){
+    for(const d of defs){
       const div = document.createElement('div');
       div.className = 'eventitem';
       const t = document.createElement('div');
       t.className = 'title';
-      t.textContent = s.title;
+      t.textContent = d.title;
       div.appendChild(t);
-      if(s.notes){
+      if(d.notes){
         const n = document.createElement('div');
         n.className = 'note';
-        n.textContent = s.notes;
+        n.textContent = d.notes;
         div.appendChild(n);
       }
       p.appendChild(div);
     }
   }
 
-  // SuperMonth periods next
+  // SuperMonths after events (Inspector can keep this order)
   if(snap.periods.length > 0){
     any = true;
     for(const item of snap.periods){
@@ -839,44 +971,42 @@ function renderMobileSheetMirrors(){
 }
 
 // ---------- +more popover ----------
-function openMorePopover(x,y,dateISO){
-  const pop = el('morePopover');
-  pop.innerHTML = '';
-  pop.hidden = false;
+function openMorePopover(dateISO, anchorEl){
+  closeMorePopover();
+  const pop = document.createElement('div');
+  pop.className = 'more-popover';
 
+  // SuperMonths first (Priority 0)
+  const sms = state.filters.superMonths ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo) : [];
+  for(const sm of sms){
+    const div = document.createElement('div');
+    div.className='pop-item';
+    div.textContent = sm.monthName;
+    pop.appendChild(div);
+  }
+
+  // All-day events next (Special then Standard via rank/sequence)
   const seo = canonicalSeoianDate(dateISO);
-  const title = document.createElement('div');
-  title.className='pop-title';
-  title.textContent = `${seo.label} (${fmtGreg(dateISO)})`;
-  pop.appendChild(title);
-
-  const close = document.createElement('div');
-  close.className='pop-close';
-  close.textContent='✕';
-  close.addEventListener('click', ()=>{ pop.hidden=true; });
-  pop.appendChild(close);
-
-  const special = state.filters.specialDays ? specialDaysForDate(dateISO).filter(s=>s.showOnCalendar) : [];
-  for(const s of special){
+  const syDefs = syEventDefsForDate(dateISO).filter(d=>d.showOnCalendar);
+  const gyDefs = gregorianDefsForDate(dateISO).filter(d=>d.showOnCalendar);
+  const defs = [...syDefs, ...gyDefs].sort((a,b)=>
+    (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title)
+  );
+  for(const d of defs){
     const div = document.createElement('div');
     div.className='pop-item';
-    div.textContent = s.title;
+    div.textContent = d.title;
     pop.appendChild(div);
   }
 
-  const items = state.filters.superMonths ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo) : [];
-  for(const it of items){
-    const div = document.createElement('div');
-    div.className='pop-item';
-    div.textContent = it.monthName;
-    pop.appendChild(div);
-  }
+  document.body.appendChild(pop);
+  const r = anchorEl.getBoundingClientRect();
+  pop.style.left = `${Math.round(r.left)}px`;
+  pop.style.top = `${Math.round(r.bottom+6)}px`;
 
-  const rect = pop.getBoundingClientRect();
-  const left = clamp(x - rect.width/2, 12, window.innerWidth - rect.width - 12);
-  const top = clamp(y + 12, 60, window.innerHeight - rect.height - 12);
-  pop.style.left = `${left}px`;
-  pop.style.top = `${top}px`;
+  state.morePopover = pop;
+
+  setTimeout(()=> document.addEventListener('click', closeMorePopover, {once:true}), 0);
 }
 
 window.addEventListener('click', (e)=>{
@@ -1202,6 +1332,12 @@ function bindControls(){
   });
   el('filterSpecialDays').checked = state.filters.specialDays;
 
+  el('filterStandardDays').addEventListener('change', (e)=>{
+    state.filters.standardDays = e.target.checked;
+    render();
+  });
+  el('filterStandardDays').checked = state.filters.standardDays;
+
   // Jump input: auto slashes
   el('jumpInput').addEventListener('input', (e)=>{
     const mode = el('jumpMode').value;
@@ -1272,7 +1408,8 @@ function bindControls(){
 async function loadData(){
   const cfgRes = await fetch('./data/supermonths_config.json');
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
-  const specialRes = await fetch('./data/AFdS_Special_Days.csv');
+  const daysRes = await fetch('./data/AFdS_Special_Days.csv');
+
   state.data.config = await cfgRes.json();
   state.data.ranges = await rangesRes.json();
   const idx = buildRangesIndex(state.data.ranges);
@@ -1280,45 +1417,68 @@ async function loadData(){
   state.data.monthNoByName = idx.monthNoByName;
   state.data.nameByMonthNo = idx.nameByMonthNo;
 
-  // Special Days (Set 1)
-  const csvText = await specialRes.text();
+  // AFdS Days (Special + Standard)
+  const csvText = await daysRes.text();
   const raw = parseCSV(csvText);
-  const specials = [];
+
+  const syByKey = new Map();
+  const gyDefs = [];
+
   for(const r of raw){
-    // tolerate slight header variations (older files)
     const id = r.ID || r.id || '';
     const title = r.Title || r.title || '';
     if(!id || !title) continue;
-    specials.push({
+
+    const anchorType = (r.Anchor_Type || r.anchor_type || 'SY').toUpperCase();
+    const category = (r.Category || r.category || '').trim() || (anchorType==='SY' ? 'Special' : 'Standard');
+    const rank = toInt(r.Rank ?? r.rank, category.toLowerCase()==='special' ? 1 : 2);
+    const seq = toInt(r.Sequence ?? r.sequence, 9999);
+
+    const def = {
       id,
-      sequence: toInt(r.Sequence ?? r.sequence, 9999),
       title,
       notes: r.Notes || r.notes || '',
       allDay: toBool(r.All_Day ?? r.all_day ?? true),
-      anchorType: (r.Anchor_Type || r.anchor_type || 'SY').toUpperCase(),
-      syMonth: toInt(r.SY_Month ?? r.sy_month, null),
-      syDay: toInt(r.SY_Day ?? r.sy_day, null),
-      syStartYear: toInt(r.SY_Start_Year ?? r.sy_year_start, 1),
-      category: (r.Category || r.category || 'Special'),
-      rank: toInt(r.Rank ?? r.rank, 1),
+      anchorType,
+      category,
+      rank,
+      sequence: seq,
       showOnCalendar: toBool(r.ShowOnCalendar ?? true),
       showInInspector: toBool(r.ShowInInspector ?? true),
       showNotesOnCalendar: toBool(r.ShowNotesOnCalendar ?? false),
-    });
+
+      // SY anchor
+      syMonth: toInt(r.SY_Month ?? r.sy_month, null),
+      syDay: toInt(r.SY_Day ?? r.sy_day, null),
+      syStartYear: toInt(r.SY_Start_Year ?? r.sy_year_start, 1),
+
+      // Gregorian rule fields
+      gregStartYear: toInt(r.Gregorian_Start_Year ?? r.Gregorian_First_Year ?? r.Gergorian_First_Year ?? r.gregorian_start_year ?? r.gregorian_first_year, 1994),
+      gyMonth: toInt(r.GY_Month ?? r.gy_month, null),
+      gyDay: toInt(r.GY_Day ?? r.gy_day, null),
+      nth: toInt(r.Nth ?? r.nth, null),
+      weekday: toInt(r.Weekday ?? r.weekday, null),
+      offsetDays: toInt(r.Offset_Days ?? r.offset_days, 0),
+    };
+
+    if(anchorType === 'SY'){
+      if(!def.syMonth || !def.syDay) continue;
+      const key = `${def.syMonth}-${def.syDay}`;
+      if(!syByKey.has(key)) syByKey.set(key, []);
+      syByKey.get(key).push(def);
+    }else{
+      gyDefs.push(def);
+    }
   }
-  // index by SY month-day
-  const byKey = new Map();
-  for(const s of specials){
-    if(!s.syMonth || !s.syDay) continue;
-    const key = `${s.syMonth}-${s.syDay}`;
-    if(!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key).push(s);
-  }
-  for(const [k,arr] of byKey.entries()){
+
+  // sort indexes
+  for(const [k,arr] of syByKey.entries()){
     arr.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
   }
-  state.data.specialDays = specials;
-  state.data.specialByKey = byKey;
+  gyDefs.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+
+  state.data.syByKey = syByKey;
+  state.data.gyDefs = gyDefs;
 }
 
 (async function init(){
