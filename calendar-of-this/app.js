@@ -150,6 +150,25 @@ function superDayBounds(dateISO, tzA, tzB){
   return { dateISO, east, west, same, start, end, durMs };
 }
 
+function durationToHHMMCeil30(ms){
+  // round UP to next 30 minutes (so 40:59 -> 41:00, 40:01 -> 40:30)
+  const minutes = Math.ceil((ms / 60000) / 30) * 30;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function superDayFactsForDate(dateISO, easternTZ, westernTZ){
+  const b = superDayBounds(dateISO, easternTZ, westernTZ);
+  return {
+    east: b.east,
+    west: b.west,
+    start: b.start.toFormat('ccc dd LLL yyyy HH:mm'),
+    end: b.end.toFormat('ccc dd LLL yyyy HH:mm'),
+    length: durationToHHMMCeil30(b.durMs),
+  };
+}
+
 function durationToHHMM(ms){
   const totalMin = Math.floor(ms/60000);
   const h = Math.floor(totalMin/60);
@@ -863,7 +882,7 @@ function snapshotDay(dateISO){
     standardDays,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
-    tzAtSnapshot: { eastern: state.tamaraTZ, western: state.martinTZ }
+   tzAtSnapshot: { tamaraTZ: state.tamaraTZ, martinTZ: state.martinTZ }
   };
   state.snapshot = snap;
   state.highlightDateISO = dateISO;
