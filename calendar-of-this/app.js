@@ -355,7 +355,7 @@ function renderMonthView(){
 
     // Bars
     const barsEl = document.createElement('div');
-    barsEl.className = 'week-bars';
+    barsEl.className = 'month-bars';
 
     const weekStartISO = weekStart.setZone(state.displayTZ).toISODate();
     const weekEndISO = weekStart.plus({days:6}).setZone(state.displayTZ).toISODate();
