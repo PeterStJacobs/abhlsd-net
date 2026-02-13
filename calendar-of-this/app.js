@@ -366,7 +366,7 @@ function renderMonthView(){
     for(const p of placed){
       const bar = document.createElement('div');
       bar.className = (p.kind === 'special') ? 'bar special' : (p.kind === 'standard' ? 'bar standard' : ('bar' + (p.lane === 1 ? ' secondary' : '')));
-      bar.style.gridColumn = `${p.colStart+2} / ${p.colEnd+3}`;
+      bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
       bar.style.gridRow = `${p.lane+1}`;
       bar.textContent = p.label;
       bar.title = p.label;
@@ -859,7 +859,7 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 
     if(lane>=0){
       for(let c=cStart;c<=cEnd;c++) lanes[lane][c]=true;
-      placed.push({ ...ev, lane, colStart:cStart, colEnd:cEnd });
+      placed.push({ ...ev, lane, colStart:cStart+1, colEnd:cEnd+1 });
     }else{
       // mark hidden counts per day in segment
       for(let c=cStart;c<=cEnd;c++){
