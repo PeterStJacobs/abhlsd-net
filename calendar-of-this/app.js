@@ -366,7 +366,7 @@ function renderMonthView(){
     for(const p of placed){
       const bar = document.createElement('div');
       bar.className = (p.kind === 'special') ? 'bar special' : (p.kind === 'standard' ? 'bar standard' : ('bar' + (p.lane === 1 ? ' secondary' : '')));
-      bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
+      bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
       bar.style.gridRow = `${p.lane+1}`;
       bar.textContent = p.label;
       bar.title = p.label;
