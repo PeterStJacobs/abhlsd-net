@@ -912,48 +912,66 @@ function renderInspector(){
   el('inspectorSeoian').textContent = snap.seoianLabel;
   el('inspectorGregorian').textContent = snap.gregorianLabel;
 
-  // periods + day events
-  const p = el('inspectorPeriods');
-  p.innerHTML = '';
+// periods + special days
+const p = el('inspectorPeriods');
+p.innerHTML = '';
 
-  const specials = (snap.specialDays || []);
-  const standards = (snap.standardDays || []);
-  let any = false;
+const specials = (snap.specialDays || []);
+const standards = (snap.standardDays || []); // only if you have this
+let any = false;
 
-  const defs = [...specials, ...standards].sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
-  if(defs.length > 0){
-    any = true;
-    for(const d of defs){
-      const div = document.createElement('div');
-      div.className = 'eventitem';
-      const t = document.createElement('div');
-      t.className = 'title';
-      t.textContent = d.title;
-      div.appendChild(t);
-      if(d.notes){
-        const n = document.createElement('div');
-        n.className = 'note';
-        n.textContent = d.notes;
-        div.appendChild(n);
-      }
-      p.appendChild(div);
+// SuperMonths first (Priority 0)
+if (snap.periods && snap.periods.length > 0) {
+  any = true;
+  for (const item of snap.periods) {
+    const div = document.createElement('div');
+    div.className = 'pill';
+    div.textContent = item;
+    p.appendChild(div);
+  }
+}
+
+// Special Days next
+if (specials.length > 0) {
+  any = true;
+  for (const s of specials) {
+    const div = document.createElement('div');
+    div.className = 'eventitem';
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = s.title;
+    div.appendChild(t);
+    if (s.notes) {
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = s.notes;
+      div.appendChild(n);
     }
+    p.appendChild(div);
   }
+}
 
-  // SuperMonths after events (Inspector can keep this order)
-  if(snap.periods.length > 0){
-    any = true;
-    for(const item of snap.periods){
-      const div = document.createElement('div');
-      div.className = 'pill';
-      div.textContent = item;
-      p.appendChild(div);
+// Standard Days last (optional)
+if (standards.length > 0) {
+  any = true;
+  for (const s of standards) {
+    const div = document.createElement('div');
+    div.className = 'eventitem';
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = s.title;
+    div.appendChild(t);
+    if (s.notes) {
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = s.notes;
+      div.appendChild(n);
     }
+    p.appendChild(div);
   }
+}
 
-  if(!any){
-    p.innerHTML = '<div class="muted">(no periods)</div>';
-  }
+if (!any) p.innerHTML = '<div class="muted">(no periods)</div>';
 
   // facts
   const f = el('inspectorFacts');
