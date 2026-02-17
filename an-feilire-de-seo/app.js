@@ -635,12 +635,12 @@ function renderListView(){
 // ---------- Events for spanning bars ----------
 
 function enabledForCategory(cat){
-  const c = String(cat || '').trim().toLowerCase();
-  if(c === 'special') return state.filters.specialDays;
-  if(c === 'standard') return state.filters.standardDays;
-  // default: show
+  const c = categoryKey(cat); // already defined earlier
+  if (isSpecialCategory(c)) return state.filters.specialDays;
+  if (isStandardCategory(c)) return state.filters.standardDays;
   return true;
 }
+
 
 function syEventDefsForDate(dateISO){
   if(!state.data.syByKey) return [];
