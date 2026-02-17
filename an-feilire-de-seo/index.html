@@ -3,123 +3,119 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>An Féilire de Seo | Calendar of This (V2)</title>
+  <title>An Féilire de Seo | Calendar of This (V2 Prototype)</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand">
-        <div class="brand-title">An Féilire de Seo</div>
-        <div class="brand-sub">The Calendar of This (v2)</div>
+      <div class="topbar-left">
+        <div class="brand">An Féilire de Seo</div>
       </div>
-
-      <div class="top-controls">
-        <div class="nav">
-          <button class="btn" id="btnPrev" title="Previous">&#x2039;</button>
-          <button class="btn" id="btnToday">Today</button>
-          <button class="btn" id="btnNext" title="Next">&#x203A;</button>
-        </div>
-
-        <div class="control">
-          <label>View</label>
-          <select id="viewSelect">
-            <option value="month">Month</option>
-            <option value="week">Week</option>
-            <option value="list">List</option>
-          </select>
-        </div>
-
-        <div class="control">
-          <label>Jump</label>
-          <div class="jumprow">
-            <select id="jumpMode">
-              <option value="seoian" selected>Seoian</option>
-              <option value="gregorian">Gregorian</option>
-            </select>
-            <input id="jumpInput" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" />
-          </div>
-          <div class="toggles">
-            <label class="chk">
-              <input type="checkbox" id="toggleGregorian" />
-              <span>Show Gregorian labels</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="control">
-          <label>Display TZ</label>
-          <select id="displayTZ"></select>
-        </div>
-
-        <div class="control filters">
-          <label>Filters</label>
-          <details class="filtersBox" id="filtersDropdown">
-            <summary class="btn">Filters ▾</summary>
-            <div class="filtersPanel">
-              <label class="chk">
-                <input type="checkbox" id="filterSuperMonths" checked />
-                <span>SuperMonths</span>
-              </label>
-              <label class="chk">
-                <input type="checkbox" id="filterSpecialDays" checked />
-                <span>Special Days</span>
-              </label>
-              <label class="chk">
-                <input type="checkbox" id="filterStandardDays" checked />
-                <span>Standard Days</span>
-              </label>
-            </div>
-          </details>
-        </div>
+      <div class="topbar-right">
+        <span class="badge">V2 Prototype</span>
       </div>
     </header>
 
     <main class="layout">
-      <!-- LEFT: Inspector -->
-      <aside class="panel left">
-        <div class="panel-head">Day Inspector</div>
-        <div class="panel-body">
-          <div class="ins-date">
-            <div class="seo" id="inspectorSeoian">—</div>
-            <div class="greg muted" id="inspectorGregorian">—</div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Active periods & events</div>
-            <div id="inspectorPeriods" class="ins-periods">
-              <div class="muted">Hover/tap a day.</div>
+      <aside class="panel left" id="leftPanel">
+        <div class="panel-inner">
+          <div class="inspector">
+            <div class="inspector-head">
+              <div class="seoian-big" id="inspectorSeoian">—</div>
+              <label class="toggle">
+                <input type="checkbox" id="toggleGregorian" />
+                <span>Show Gregorian</span>
+              </label>
+              <div class="gregorian-small" id="inspectorGregorian" hidden>—</div>
             </div>
-          </div>
 
-          <div class="section">
-            <div class="section-title">SuperDay facts</div>
-            <div id="inspectorFacts" class="ins-facts">
-              <div class="muted">Hover/tap a day.</div>
+            <div class="section">
+              <div class="section-title">Active periods</div>
+              <div class="list" id="inspectorPeriods">
+                <div class="muted">Hover/tap a day.</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">SuperDay facts (snapshot)</div>
+              <div class="facts" id="inspectorFacts">
+                <div class="muted">Hover/tap a day.</div>
+              </div>
             </div>
           </div>
         </div>
       </aside>
 
-      <!-- CENTER: Calendar -->
-      <section class="panel center">
-        <div class="panel-head">
-          <div id="calendarTitle" class="cal-title">—</div>
+      <section class="center">
+        <div class="cal-header">
+          <div class="nav">
+            <button class="btn" id="btnToday">Today</button>
+            <button class="iconbtn" id="btnPrev" aria-label="Previous">‹</button>
+            <button class="iconbtn" id="btnNext" aria-label="Next">›</button>
+            <div class="title" id="calTitle">—</div>
+          </div>
+
+          <div class="controls">
+            <div class="control">
+              <label>View</label>
+              <select id="viewSelect">
+                <option value="month">Month</option>
+                <option value="week">Week</option>
+                <option value="list">List</option>
+              </select>
+            </div>
+
+            <div class="control jump">
+              <label>Jump</label>
+              <div class="jump-row">
+                <select id="jumpMode">
+                  <option value="seoian" selected>Seoian</option>
+                  <option value="gregorian">Gregorian</option>
+                </select>
+                <input id="jumpInput" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" />
+                <button class="btn" id="btnJump">Go</button>
+              </div>
+            </div>
+
+            <div class="control">
+              <label>Display TZ</label>
+              <select id="displayTZ"></select>
+            </div>
+
+            <div class="control">
+              <button class="btn" id="btnFilters">Filters ▾</button>
+              <div class="dropdown" id="filtersDropdown" hidden>
+                <label class="chk">
+                  <input type="checkbox" id="filterSupermonths" checked />
+                  <span>SuperMonths</span>
+                </label>
+                <label class="chk">
+                  <input type="checkbox" id="filterSpecialDays" checked />
+                  <span>Special Days</span>
+                </label>
+                <label class="chk">
+                  <input type="checkbox" id="filterStandardDays" checked />
+                  <span>Standard Days</span>
+                </label>
+                <div class="muted small">More layers later.</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="panel-body">
-          <div id="calendarBody"></div>
+
+        <div class="cal-surface" id="calSurface">
+          <!-- injected -->
         </div>
       </section>
 
-      <!-- RIGHT: Clocks -->
-      <aside class="panel right">
-        <div class="panel-head">Clocks</div>
-        <div class="panel-body clocks">
+      <aside class="panel right" id="rightPanel">
+        <div class="panel-inner clocks">
           <div class="clock-block">
             <label class="tzlabel">Eastern TZ</label>
-            <select class="tzselect" id="tzEast"></select>
-            <div class="clockface" id="clockEast"></div>
+            <select class="tzselect" id="tzTamara"></select>
+            <div class="clockface" id="clockTamara"></div>
             <div class="ampm" id="ampmEast">—</div>
           </div>
 
@@ -134,30 +130,40 @@
 
           <div class="clock-block">
             <label class="tzlabel">Western TZ</label>
-            <select class="tzselect" id="tzWest"></select>
-            <div class="clockface" id="clockWest"></div>
+            <select class="tzselect" id="tzMartin"></select>
+            <div class="clockface" id="clockMartin"></div>
             <div class="ampm" id="ampmWest">—</div>
           </div>
-        </div>
+</div>
       </aside>
-    </main>
 
-    <!-- Simple modal for "+ more" -->
-    <div class="modal" id="moreModal" hidden>
-      <div class="modal-card">
-        <div class="modal-head">
-          <div class="modal-title" id="moreModalTitle">More</div>
-          <button class="btn" id="moreModalClose">Close</button>
+      <!-- Mobile bottom sheet -->
+      <div class="bottom-sheet" id="bottomSheet">
+        <div class="sheet-handle" id="sheetHandle">
+          <div class="sheet-handle-text" id="sheetHandleText">Tap a day</div>
+          <div class="sheet-handle-icon">▴</div>
         </div>
-        <div class="modal-body" id="moreModalBody"></div>
+        <div class="sheet-tabs">
+          <button class="tab active" data-tab="inspector">Inspector</button>
+          <button class="tab" data-tab="clocks">Clocks</button>
+        </div>
+        <div class="sheet-body">
+          <div class="sheet-pane active" id="sheetInspector"></div>
+          <div class="sheet-pane" id="sheetClocks"></div>
+        </div>
       </div>
-    </div>
 
-    <footer class="foot muted">
-      Read-only prototype. Updates come from repo commits.
-    </footer>
+      <!-- Popover for +more -->
+      <div class="popover" id="morePopover" hidden>
+        <div class="pop-header">
+          <div class="pop-title">More</div>
+          <button class="pop-close" id="moreClose" type="button">Close</button>
+        </div>
+        <div class="pop-body" id="morePopoverBody"></div>
+      </div>
+    </main>
   </div>
 
-  <script src="./app.js" defer></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
