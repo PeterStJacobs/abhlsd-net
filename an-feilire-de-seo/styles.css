@@ -256,6 +256,7 @@ body{
 
 .week-cell{
   height:28px;
+  position:relative;
   border-right:1px solid var(--line);
   border-bottom:1px solid var(--line);
   background:white;
@@ -506,4 +507,42 @@ body{
   .sheet-body{ height:calc(100% - 86px); overflow:auto; }
   .sheet-pane{ display:none; padding:12px; }
   .sheet-pane.active{ display:block; }
+}
+
+
+/* One-Off timed events */
+.day-items{
+  margin-top:8px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.day-item{
+  font-size:11px;
+  color:var(--text);
+  opacity:0.9;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.day-item .t{
+  font-family:var(--mono);
+  color:var(--muted);
+  margin-right:6px;
+}
+.oneoff-block{
+  position:absolute;
+  left:4px;
+  right:4px;
+  border-radius:6px;
+  padding:2px 4px;
+  font-size:11px;
+  line-height:1.15;
+  background: rgba(90,80,160,0.12);
+  color:#2e2a6b;
+  border:1px solid rgba(90,80,160,0.18);
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  pointer-events:none;
 }
