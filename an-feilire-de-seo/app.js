@@ -28,7 +28,7 @@ const state = {
   view: 'month',
   displayTZ: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   focusDateISO: DateTime.now().toISODate(), // date label used for navigation
-  filters: { superMonths: true, specialDays: true, standardDays: true },
+  filters: { superMonths: true, specialDays: true, standardDays: true, oneOff: true },
   tamaraTZ: DEFAULTS.tamaraTZ,
   martinTZ: DEFAULTS.martinTZ,
   snapshot: null, // {dateISO, seoianLabel, gregorianLabel, periods[], facts{...}, tzAtSnapshot{...}}
@@ -41,6 +41,7 @@ const state = {
     nameByMonthNo: null,
     syByKey: null,
     gyDefs: null,
+    oneOffDefs: null,
   }
 };
 
@@ -82,6 +83,7 @@ function parseCSV(text){
   if(row.length>1 || row[0]!=='' ) rows.push(row);
   if(rows.length===0) return [];
   const headers = rows[0].map(h=>h.trim());
+  if(headers.length && headers[0].startsWith('\ufeff')) headers[0] = headers[0].replace(/^\ufeff/, '');
   const out = [];
   for(let r=1;r<rows.length;r++){
     if(rows[r].every(v=>String(v).trim()==='')) continue;
@@ -111,6 +113,27 @@ function isStandardCategory(c){ return categoryKey(c).startsWith('standard'); }
 function toInt(v, def=null){
   const n = parseInt(String(v ?? '').trim(),10);
   return Number.isFinite(n) ? n : def;
+}
+
+function parseDateTimeFlexible(s, zone){
+  const str = String(s ?? '').trim();
+  if(!str) return null;
+  let dt = null;
+  if(str.includes('T')){
+    dt = DateTime.fromISO(str, {zone});
+    if(dt.isValid) return dt;
+  }
+  dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm:ss', {zone});
+  if(dt.isValid) return dt;
+  dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm', {zone});
+  if(dt.isValid) return dt;
+  dt = DateTime.fromISO(str, {zone});
+  if(dt.isValid) return dt;
+  return null;
+}
+
+function fmtTimeHHMM(dt){
+  return dt.toFormat('HH:mm');
 }
 
 function pad2(n){ return String(n).padStart(2,'0'); }
@@ -347,6 +370,7 @@ function renderMonthView(){
   const rangeEndISO = monthSeo.canonical ? monthSeo.canonical.end : dt.endOf('month').toISODate();
   const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
   const end = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
+  const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
   let cursor = start;
 
   while(cursor <= end){
@@ -415,7 +439,30 @@ function renderMonthView(){
       // show small gregorian day number always in grid (matches examples)
       day.appendChild(g);
 
-      const hiddenCount = hiddenByDay.get(dateISO) || 0;
+      // One-Off timed events (inside cell)
+      const oneOffs = oneOffByDay.get(dateISO) || [];
+      const MAX_TIMED_VISIBLE = 2;
+      if(oneOffs.length){
+        const items = document.createElement('div');
+        items.className = 'day-items';
+        oneOffs.slice(0, MAX_TIMED_VISIBLE).forEach(ev=>{
+          const row = document.createElement('div');
+          row.className = 'day-item';
+          const t = document.createElement('span');
+          t.className = 't';
+          t.textContent = fmtTimeHHMM(ev.startLocal);
+          row.appendChild(t);
+          const txt = document.createElement('span');
+          txt.textContent = ev.title;
+          row.appendChild(txt);
+          items.appendChild(row);
+        });
+        day.appendChild(items);
+      }
+
+      const hiddenBars = hiddenByDay.get(dateISO) || 0;
+      const hiddenTimed = Math.max(0, oneOffs.length - MAX_TIMED_VISIBLE);
+      const hiddenCount = hiddenBars + hiddenTimed;
       if(hiddenCount > 0){
         const more = document.createElement('div');
         more.className = 'more';
@@ -513,6 +560,8 @@ function renderWeekView(){
   const grid = document.createElement('div');
   grid.className = 'week-grid';
 
+  const cellMap = new Map();
+
   // Week view is always 24 rows. Overflow hours are shown as secondary markers in the gutter.
   const extraCount = Math.max(0, Math.ceil(nHoursRounded) - 24);
 
@@ -535,12 +584,54 @@ function renderWeekView(){
     for(let d=0; d<7; d++){
       const cell = document.createElement('div');
       cell.className = 'week-cell';
+      const dateISO = dt.plus({days:d}).toISODate();
+      cell.dataset.date = dateISO;
+      cell.dataset.hour = String(h);
+      cellMap.set(`${dateISO}|${String(h).padStart(2,'0')}`, cell);
       grid.appendChild(cell);
     }
   }
 
+  // One-Off timed blocks (Display TZ)
+  renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO);
+
   wrap.appendChild(grid);
   return wrap;
+}
+
+
+function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
+  if(!enabledForOneOff()) return;
+  const byDay = groupOneOffsByDay(weekStartISO, weekEndISO, 'calendar');
+  const ROW_H = 28; // must match .week-cell height
+
+  for(const [dateISO, events] of byDay.entries()){
+    for(const ev of events){
+      // split across hours if needed
+      let start = ev.startLocal;
+      let remainingMin = ev.durationMinutes || 30;
+
+      while(remainingMin > 0){
+        const hourKey = `${dateISO}|${String(start.hour).padStart(2,'0')}`;
+        const cell = cellMap.get(hourKey);
+        const minInHour = start.minute;
+        const cap = 60 - minInHour;
+        const take = Math.min(remainingMin, cap);
+        if(cell){
+          const block = document.createElement('div');
+          block.className = 'oneoff-block';
+          const top = (minInHour/60) * ROW_H;
+          const height = Math.max(6, (take/60) * ROW_H);
+          block.style.top = `${top}px`;
+          block.style.height = `${height}px`;
+          block.textContent = ev.title;
+          cell.appendChild(block);
+        }
+        remainingMin -= take;
+        start = start.plus({minutes: take});
+      }
+    }
+  }
 }
 
 function renderListView(){
@@ -555,6 +646,8 @@ function renderListView(){
   const start = focus.startOf('day').minus({days:3});
   const end = focus.startOf('day').plus({days:26});
 
+  const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
+
   for(let i=0;i<=end.diff(start,'days').days;i++){
     const d = start.plus({days:i});
     const dateISO = d.toISODate();
@@ -563,6 +656,7 @@ function renderListView(){
     const syDefs = syEventDefsForDate(dateISO).filter(d=>d.showOnCalendar);
     const gyDefs = gregorianDefsForDate(dateISO).filter(d=>d.showOnCalendar);
     const dayDefs = [...syDefs, ...gyDefs].sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+    const oneOffs = oneOffByDay.get(dateISO) || [];
 
     const card = document.createElement('div');
     card.style.border='1px solid var(--line)';
@@ -617,6 +711,14 @@ function renderListView(){
         row.style.fontWeight='600';
         items.appendChild(row);
       }
+
+      // Then One-Off timed events
+      for(const ev of oneOffs){
+        const row = document.createElement('div');
+        row.textContent = `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`;
+        row.style.fontSize='13px';
+        items.appendChild(row);
+      }
     }
     card.appendChild(items);
 
@@ -635,12 +737,15 @@ function renderListView(){
 // ---------- Events for spanning bars ----------
 
 function enabledForCategory(cat){
-  const c = categoryKey(cat); // already defined earlier
-  if (isSpecialCategory(c)) return state.filters.specialDays;
-  if (isStandardCategory(c)) return state.filters.standardDays;
+  const c = categoryKey(cat);
+  if(isSpecialCategory(c)) return state.filters.specialDays;
+  if(isStandardCategory(c)) return state.filters.standardDays;
   return true;
 }
 
+function enabledForOneOff(){
+  return !!state.filters.oneOff;
+}
 
 function syEventDefsForDate(dateISO){
   if(!state.data.syByKey) return [];
@@ -747,6 +852,54 @@ function gregorianDefsForDate(dateISO){
   }
   return out;
 }
+
+function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
+  const out = new Map();
+  if(!state.data.oneOffDefs || !enabledForOneOff()) return out;
+
+  const rangeStart = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
+  const rangeEnd = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).endOf('day');
+  const startUTC = rangeStart.toUTC().toMillis();
+  const endUTC = rangeEnd.toUTC().toMillis();
+
+  for(const def of state.data.oneOffDefs){
+    if(context === 'calendar' && !def.showOnCalendar) continue;
+    if(context === 'inspector' && !def.showInInspector) continue;
+
+    if(def.startUtcMs > endUTC || def.endUtcMs < startUTC) continue;
+
+    const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+    const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+
+    let cursor = startLocal.startOf('day');
+    const last = endLocal.startOf('day');
+    while(cursor <= last){
+      const iso = cursor.toISODate();
+      if(iso >= rangeStartISO && iso <= rangeEndISO){
+        if(!out.has(iso)) out.set(iso, []);
+        out.get(iso).push({ ...def, startLocal, endLocal });
+      }
+      cursor = cursor.plus({days:1});
+    }
+  }
+
+  for(const [k,arr] of out.entries()){
+    arr.sort((a,b)=>
+      a.startLocal.toMillis() - b.startLocal.toMillis() ||
+      (a.rank-b.rank) ||
+      (a.sequence-b.sequence) ||
+      a.title.localeCompare(b.title)
+    );
+  }
+
+  return out;
+}
+
+function oneOffsForDate(dateISO, context='calendar'){
+  const m = groupOneOffsByDay(dateISO, dateISO, context);
+  return m.get(dateISO) || [];
+}
+
 
 function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   const events = [];
@@ -884,6 +1037,7 @@ function snapshotDay(dateISO){
   const periods = state.filters.superMonths ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName) : [];
   const specialDays = state.filters.specialDays ? syEventDefsForDate(dateISO).filter(d=>isSpecialCategory(d.category) && d.showInInspector) : [];
   const standardDays = state.filters.standardDays ? gregorianDefsForDate(dateISO).filter(d=>isStandardCategory(d.category) && d.showInInspector) : [];
+  const oneOffs = (state.filters.oneOff && state.data.oneOffDefs) ? oneOffsForDate(dateISO, 'inspector') : [];
 
   const snap = {
     dateISO,
@@ -891,6 +1045,7 @@ function snapshotDay(dateISO){
     gregorianLabel: fmtGreg(dateISO),
     specialDays,
     standardDays,
+    oneOffs,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
    tzAtSnapshot: { tamaraTZ: state.tamaraTZ, martinTZ: state.martinTZ }
@@ -977,6 +1132,28 @@ if (standards.length > 0) {
   }
 }
 
+
+// One-Off Events last
+const oneOffs = (snap.oneOffs || []);
+if(oneOffs.length > 0){
+  any = true;
+  for(const ev of oneOffs){
+    const div = document.createElement('div');
+    div.className = 'eventitem';
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`;
+    div.appendChild(t);
+    if(ev.notes){
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = ev.notes;
+      div.appendChild(n);
+    }
+    p.appendChild(div);
+  }
+}
+
 if (!any) p.innerHTML = '<div class="muted">(no periods)</div>';
 
   // facts
@@ -1018,6 +1195,26 @@ function renderMobileSheetMirrors(){
   clk.appendChild(cloneClocks);
 }
 
+// Helpers for +more
+function activePeriodsForISO(dateISO){
+  const out = [];
+  if(state.filters.superMonths){
+    const active = activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo);
+    for(const a of active){
+      out.push({ name: a.monthName, kind: 'supermonth' });
+    }
+  }
+  return out;
+}
+
+function allDayDefsForDate(dateISO){
+  const sy = syEventDefsForDate(dateISO).filter(d=>d.showOnCalendar);
+  const gy = gregorianDefsForDate(dateISO).filter(d=>d.showOnCalendar);
+  const defs = [...sy, ...gy].filter(d=>enabledForCategory(d.category));
+  defs.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+  return defs;
+}
+
 // ---------- +more popover ----------
 function closeMorePopover(){
   const pop = el('morePopover');
@@ -1034,15 +1231,27 @@ function openMorePopover(dateISO, anchorEl){
 
   body.innerHTML = '';
 
-  // Build the list: periods (supermonths) then all-day events
+  // Build the list (strict priority): SuperMonths → Special → Standard → One-Off
   const periods = activePeriodsForISO(dateISO);
   const defs = allDayDefsForDate(dateISO);
-
   const items = [];
+
+  // SuperMonths (Priority 0)
   periods.forEach(p => items.push({ label: p.name, kind: 'period' }));
-  defs.forEach(d => {
-    const kind = isSpecialCategory(d.category) ? 'special' : isStandardCategory(d.category) ? 'standard' : 'other';
-    items.push({ label: d.title, kind });
+
+  // All-day events
+  const specials = defs.filter(d=> isSpecialCategory(d.category));
+  const standards = defs.filter(d=> isStandardCategory(d.category));
+  const others = defs.filter(d=> !isSpecialCategory(d.category) && !isStandardCategory(d.category));
+
+  specials.forEach(d => items.push({ label: d.title, kind: 'special' }));
+  standards.forEach(d => items.push({ label: d.title, kind: 'standard' }));
+  others.forEach(d => items.push({ label: d.title, kind: 'other' }));
+
+  // One-Off timed events
+  const oneOffs = oneOffsForDate(dateISO, 'calendar');
+  oneOffs.forEach(ev => {
+    items.push({ label: `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`, kind: 'oneoff' });
   });
 
   if(!items.length){
@@ -1422,6 +1631,12 @@ function bindControls(){
   });
   el('filterStandardDays').checked = state.filters.standardDays;
 
+  el('filterOneOff').addEventListener('change', (e)=>{
+    state.filters.oneOff = e.target.checked;
+    render();
+  });
+  el('filterOneOff').checked = state.filters.oneOff;
+
   // Jump input: auto slashes
   el('jumpInput').addEventListener('input', (e)=>{
     const mode = el('jumpMode').value;
@@ -1493,6 +1708,8 @@ async function loadData(){
   const cfgRes = await fetch('./data/supermonths_config.json');
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
+  let oneOffRes = null;
+  try{ oneOffRes = await fetch('./data/AFdS_OneOff_StarSystems.csv'); }catch(e){ oneOffRes = null; }
 
   state.data.config = await cfgRes.json();
   state.data.ranges = await rangesRes.json();
@@ -1505,8 +1722,17 @@ async function loadData(){
   const csvText = await daysRes.text();
   const raw = parseCSV(csvText);
 
+  // One-Off star systems (timestamped)
+  let oneOffRaw = [];
+  if(oneOffRes && oneOffRes.ok){
+    const t = await oneOffRes.text();
+    oneOffRaw = parseCSV(t);
+  }
+
+
   const syByKey = new Map();
   const gyDefs = [];
+  const oneOffDefs = [];
 
   for(const r of raw){
     const id = r.ID || r.id || '';
@@ -1555,6 +1781,47 @@ async function loadData(){
     }
   }
 
+  // Parse one-offs
+  for(const r of oneOffRaw){
+    const id = r.ID || r.id || r['\ufeffID'] || '';
+    const title = r.Title || r.title || '';
+    if(!id || !title) continue;
+
+    const anchorType = (r.Anchor_Type || r.anchor_type || 'GY_ONEOFF').toUpperCase();
+    if(anchorType !== 'GY_ONEOFF') continue;
+
+    const category = (r.Category || r.category || 'OneOFF').trim() || 'OneOFF';
+    const rank = toInt(r.Rank ?? r.rank, 3);
+    const seq = toInt(r.Sequence ?? r.sequence, 9999);
+
+    const originTZ = String(r.Origin_TZ || r.origin_tz || 'America/Toronto').trim() || 'America/Toronto';
+    const durMin = toInt(r.Duration_Minutes ?? r.duration_minutes, 30) ?? 30;
+    const originStr = r.Origin_Gregorian_Date || r.origin_gregorian_date || '';
+
+    const dtOrigin = parseDateTimeFlexible(originStr, originTZ);
+    if(!dtOrigin || !dtOrigin.isValid) continue;
+
+    const startUtcMs = dtOrigin.toUTC().toMillis();
+    const endUtcMs = dtOrigin.plus({minutes: durMin}).toUTC().toMillis();
+
+    oneOffDefs.push({
+      id,
+      title,
+      notes: r.Notes || r.notes || '',
+      anchorType,
+      category,
+      rank,
+      sequence: seq,
+      showOnCalendar: toBoolDefault(r.ShowOnCalendar ?? true),
+      showInInspector: toBoolDefault(r.ShowInInspector ?? true),
+      showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar ?? false),
+      startUtcMs,
+      endUtcMs,
+      durationMinutes: durMin,
+      originTZ
+    });
+  }
+
   // sort indexes
   for(const [k,arr] of syByKey.entries()){
     arr.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
@@ -1563,6 +1830,8 @@ async function loadData(){
 
   state.data.syByKey = syByKey;
   state.data.gyDefs = gyDefs;
+  state.data.oneOffDefs = oneOffDefs;
+
 }
 
 (async function init(){
