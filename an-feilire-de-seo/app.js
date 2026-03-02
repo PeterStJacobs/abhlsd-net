@@ -579,7 +579,6 @@ function renderWeekView(){
     ov.className = 'ov';
     ov.textContent = (h < extraCount) ? `${String(24+h).padStart(2,'0')}:00` : '';
     lbl.appendChild(ov);
-    }
 
     grid.appendChild(lbl);
 
@@ -1756,9 +1755,9 @@ async function loadData(){
       category,
       rank,
       sequence: seq,
-      showOnCalendar: toBoolDefault(r.ShowOnCalendar ?? true),
-      showInInspector: toBoolDefault(r.ShowInInspector ?? true),
-      showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar ?? false),
+      showOnCalendar: toBoolDefault(r.ShowOnCalendar, true),
+      showInInspector: toBoolDefault(r.ShowInInspector, true),
+      showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar, false),
 
       // SY anchor
       syMonth: toInt(r.SY_Month ?? r.sy_month, null),
@@ -1815,9 +1814,9 @@ async function loadData(){
       category,
       rank,
       sequence: seq,
-      showOnCalendar: toBoolDefault(r.ShowOnCalendar ?? true),
-      showInInspector: toBoolDefault(r.ShowInInspector ?? true),
-      showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar ?? false),
+      showOnCalendar: toBoolDefault(r.ShowOnCalendar, true),
+      showInInspector: toBoolDefault(r.ShowInInspector, true),
+      showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar, false),
       startUtcMs,
       endUtcMs,
       durationMinutes: durMin,
