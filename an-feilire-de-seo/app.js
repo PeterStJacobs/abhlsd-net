@@ -568,15 +568,17 @@ function renderWeekView(){
   for(let h=0; h<24; h++){
     const lbl = document.createElement('div');
     lbl.className = 'time-label';
+
     const primary = document.createElement('span');
+    primary.className = 'main';
     primary.textContent = `${String(h).padStart(2,'0')}:00`;
     lbl.appendChild(primary);
 
-    if(h < extraCount){
-      const ov = document.createElement('span');
-      ov.className = 'ov';
-      ov.textContent = `${String(24+h).padStart(2,'0')}:00`;
-      lbl.appendChild(ov);
+    // always present (blank spacer when no overlap)
+    const ov = document.createElement('span');
+    ov.className = 'ov';
+    ov.textContent = (h < extraCount) ? `${String(24+h).padStart(2,'0')}:00` : '';
+    lbl.appendChild(ov);
     }
 
     grid.appendChild(lbl);
@@ -603,8 +605,9 @@ function renderWeekView(){
 function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
   if(!enabledForOneOff()) return;
   const byDay = groupOneOffsByDay(weekStartISO, weekEndISO, 'calendar');
-  const ROW_H = 28; // must match .week-cell height
-
+  const ROW_H = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--week-row-h')) || 56;
+  const MIN_H = 18;
+  
   for(const [dateISO, events] of byDay.entries()){
     for(const ev of events){
       // split across hours if needed
@@ -621,7 +624,7 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
           const block = document.createElement('div');
           block.className = 'oneoff-block';
           const top = (minInHour/60) * ROW_H;
-          const height = Math.max(6, (take/60) * ROW_H);
+          const height = Math.max(MIN_H, (take/60) * ROW_H);
           block.style.top = `${top}px`;
           block.style.height = `${height}px`;
           block.textContent = ev.title;
