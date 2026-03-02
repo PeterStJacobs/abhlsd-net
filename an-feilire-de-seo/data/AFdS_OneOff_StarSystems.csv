@@ -1,5 +1,5 @@
 ﻿ID,Sequence,Title,Notes,All_Day,Anchor_Type,SY_Month,SY_Day,SY_Start_Year,Origin_Gregorian_Date,Gregorian_First_Year,ShowOnCalendar,ShowInInspector,ShowNotesOnCalendar,Category,Rank,GY_Month,GY_Day,Nth,Weekday,Offset_Days,Origin_TZ,Duration_Minutes
-OneOFF_StarSystem_0000,10,Toronto International Airport,The Wavefront was released from Toronto International Airport,FALSE,GY_ONEOFF,,,,1994-06-03 15:30:00,1994,TRUE,TRUE,FALSE,OneOFF_StarSystem,3,6,3,,,,America/Toronto,30
+OneOFF_StarSystem_0000,10,Toronto International Airport,The Wavefront was released from Toronto International Airport,FALSE,GY_ONEOFF,,,,1994-06-03 15:00:00,1994,TRUE,TRUE,FALSE,OneOFF_StarSystem,3,6,3,,,,America/Toronto,30
 OneOFF_StarSystem_0001,20,Solar System - Sun (Sol),Star System No. 1 has now been reached by the Wave Front: Solar System - Sun (Sol),FALSE,GY_ONEOFF,,,,1994-06-03 15:08:19,1994,TRUE,TRUE,FALSE,OneOFF_StarSystem,3,6,3,,,,America/Toronto,30
 OneOFF_StarSystem_0002,30,"Alpha Centauri - Proxima Centauri (C, V645 Centauri)","Star System No. 2 has now been reached by the Wave Front: Alpha Centauri - Proxima Centauri (C, V645 Centauri)",FALSE,GY_ONEOFF,,,,1998-09-01 15:49:08,1998,TRUE,TRUE,FALSE,OneOFF_StarSystem,3,9,1,,,,America/Toronto,30
 OneOFF_StarSystem_0003,40,Alpha Centauri - Rigil Kentaurus (A),Star System No. 3 has now been reached by the Wave Front: Alpha Centauri - Rigil Kentaurus (A),FALSE,GY_ONEOFF,,,,1998-10-07 07:22:50,1998,TRUE,TRUE,FALSE,OneOFF_StarSystem,3,10,7,,,,America/Toronto,30
@@ -2846,3 +2846,4 @@ OneOFF_StarSystem_2608,26090,Kepler-411A,"Star System No. 2,608 has now been rea
 ,,,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,,,
+
