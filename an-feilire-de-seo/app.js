@@ -1142,16 +1142,29 @@ if(oneOffs.length > 0){
   for(const ev of oneOffs){
     const div = document.createElement('div');
     div.className = 'eventitem';
+
+  // Local time (Display TZ) in the title
     const t = document.createElement('div');
     t.className = 'title';
     t.textContent = `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`;
     div.appendChild(t);
+
+  // Origin time line (Origin_TZ)
+    const originTZ = ev.originTZ || 'UTC';
+    const originDT = DateTime.fromMillis(ev.startUtcMs, {zone:'utc'}).setZone(originTZ);
+    const o = document.createElement('div');
+    o.className = 'note';
+    o.textContent = `Origin: ${originDT.toFormat('dd/LL/yyyy HH:mm')} ${originTZ}`;
+    div.appendChild(o);
+
+  // Existing notes (if any)
     if(ev.notes){
       const n = document.createElement('div');
       n.className = 'note';
       n.textContent = ev.notes;
       div.appendChild(n);
     }
+
     p.appendChild(div);
   }
 }
