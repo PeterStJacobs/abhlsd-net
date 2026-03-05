@@ -529,6 +529,12 @@ function renderWeekView(){
       cell.appendChild(sub);
     }
 
+    cell.addEventListener('mouseenter', ()=>{
+      if(window.matchMedia('(max-width: 1040px)').matches) return;
+      snapshotDay(dateISO);
+    });
+    cell.addEventListener('click', ()=> snapshotDay(dateISO));
+
     header.appendChild(cell);
   }
   wrap.appendChild(header);
