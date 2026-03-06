@@ -9,6 +9,7 @@
   --radius:14px;
   --shadow: 0 6px 18px rgba(0,0,0,0.06);
   --week-row-h: 56px; /* Week hour row height for legibility */
+  --week-dow-h: 58px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
@@ -253,9 +254,16 @@ body{
   display:grid;
   grid-template-columns: 70px repeat(7, 1fr);
   grid-auto-rows: 22px;
-  gap:2px 6px;
+  position: sticky;    /* new */
+  top: 0;              /* default; overridden below */
+  /* top: 49px; */ /* approx height of .week.dow; adjust if needed */
+  top: var(--week-dow-h);
+  z-index: 19;
+  background: #fff;
+  padding-top: 6px;    /* new */
+  gap:2px 6px;         /* old */
   padding:6px 6px 0 6px;
-  position:relative;
+  position:relative;    /* old */
   z-index:1;
 }
 
@@ -536,6 +544,7 @@ body{
   .dow,
   .week-dow{
     position:static;
+    height: var(--week-dow-h);
   }
 
   .bottom-sheet{
