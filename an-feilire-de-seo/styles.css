@@ -10,7 +10,7 @@
   --shadow: 0 6px 18px rgba(0,0,0,0.06);
 
   --week-row-h: 56px; /* Week hour row height for legibility */
-  --week-dow-h: 50px; /* Sticky offset for week all-day bars */
+  --week-dow-h: 42px; /* Sticky offset for week all-day bars */
 
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
