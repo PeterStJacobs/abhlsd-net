@@ -258,6 +258,7 @@ body{
   top: 0;              /* default; overridden below */
   /* top: 49px; */ /* approx height of .week.dow; adjust if needed */
   top: var(--week-dow-h);
+  border-bottom: 1px solid var(--line);
   z-index: 19;
   background: #fff;
   padding-top: 6px;    /* new */
