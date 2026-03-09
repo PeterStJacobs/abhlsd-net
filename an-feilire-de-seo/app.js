@@ -1816,14 +1816,27 @@ async function loadData(){
     const seq = toInt(r.Sequence ?? r.sequence, 9999);
 
     const originTZ = String(r.Origin_TZ || r.origin_tz || 'America/Toronto').trim() || 'America/Toronto';
-    const durMin = toInt(r.Duration_Minutes ?? r.duration_minutes, 30) ?? 30;
     const originStr = r.Origin_Gregorian_Date || r.origin_gregorian_date || '';
-
     const dtOrigin = parseDateTimeFlexible(originStr, originTZ);
     if(!dtOrigin || !dtOrigin.isValid) continue;
 
+    // Optional End fields
+      const endStr = r.End_Gregorian_Date || r.end_gregorian_date || '';
+      const endTZ = String(r.End_TZ || r.end_tz || originTZ).trim() || originTZ;
+      const dtEnd = endStr ? parseDateTimeFlexible(endStr, endTZ) : null;
+
+    // Duration fallback
+    const durMin = toInt(r.Duration_Minutes ?? r.duration_minutes, 30) ?? 30;
+
     const startUtcMs = dtOrigin.toUTC().toMillis();
-    const endUtcMs = dtOrigin.plus({minutes: durMin}).toUTC().toMillis();
+    let endUtcMs;
+
+    if(dtEnd && dtEnd.isValid){
+      endUtcMs = dtEnd.toUTC().toMillis();
+      if(endUtcMs <= startUtcMs) continue; // guard bad rows
+    } else {
+      endUtcMs = dtOrigin.plus({minutes: durMin}).toUTC().toMillis();
+    }
 
     oneOffDefs.push({
       id,
@@ -1838,8 +1851,9 @@ async function loadData(){
       showNotesOnCalendar: toBoolDefault(r.ShowNotesOnCalendar, false),
       startUtcMs,
       endUtcMs,
-      durationMinutes: durMin,
-      originTZ
+      durationMinutes: Math.round((endUtcMs - startUtcMs)/60000),
+      originTZ,
+      endTZ
     });
   }
 
