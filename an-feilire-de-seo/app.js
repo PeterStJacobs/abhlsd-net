@@ -865,32 +865,51 @@ function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
   const out = new Map();
   if(!state.data.oneOffDefs || !enabledForOneOff()) return out;
 
+  // Day window in DISPLAY TZ
   const rangeStart = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
   const rangeEnd = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).endOf('day');
-  const startUTC = rangeStart.toUTC().toMillis();
-  const endUTC = rangeEnd.toUTC().toMillis();
+
+  // We'll test overlap in DISPLAY TZ using end-exclusive semantics:
+  // overlap if (eventStart < dayEndExclusive) && (eventEnd > dayStart)
+  const rangeStartMs = rangeStart.toMillis();
+  const rangeEndMsExclusive = rangeEnd.plus({milliseconds: 1}).toMillis(); // exclusive endpoint
 
   for(const def of state.data.oneOffDefs){
     if(context === 'calendar' && !def.showOnCalendar) continue;
     if(context === 'inspector' && !def.showInInspector) continue;
 
-    if(def.startUtcMs > endUTC || def.endUtcMs < startUTC) continue;
-
+    // Convert event interval to DISPLAY TZ
     const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
     const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
 
-    let cursor = startLocal.startOf('day');
-    const last = endLocal.startOf('day');
-    while(cursor <= last){
-      const iso = cursor.toISODate();
-      if(iso >= rangeStartISO && iso <= rangeEndISO){
-        if(!out.has(iso)) out.set(iso, []);
-        out.get(iso).push({ ...def, startLocal, endLocal });
+    // Quick reject against overall range using end-exclusive overlap
+    if(startLocal.toMillis() >= rangeEndMsExclusive) continue;
+    if(endLocal.toMillis() <= rangeStartMs) continue;
+
+    // Iterate days touched, but DO NOT include a day that starts exactly at endLocal
+    let dayCursor = startLocal.startOf('day');
+    const lastDay = endLocal.minus({milliseconds: 1}).startOf('day'); // key line for end-exclusive
+
+    while(dayCursor <= lastDay){
+      const dayISO = dayCursor.toISODate();
+
+      // Apply the user-requested range (inclusive of dates)
+      if(dayISO >= rangeStartISO && dayISO <= rangeEndISO){
+        const dayStart = dayCursor;
+        const dayEndExclusive = dayCursor.plus({days:1});
+
+        // End-exclusive overlap test for this day
+        if(startLocal < dayEndExclusive && endLocal > dayStart){
+          if(!out.has(dayISO)) out.set(dayISO, []);
+          out.get(dayISO).push({ ...def, startLocal, endLocal });
+        }
       }
-      cursor = cursor.plus({days:1});
+
+      dayCursor = dayCursor.plus({days:1});
     }
   }
 
+  // Sort within each day: time then rank/sequence then title
   for(const [k,arr] of out.entries()){
     arr.sort((a,b)=>
       a.startLocal.toMillis() - b.startLocal.toMillis() ||
@@ -902,7 +921,6 @@ function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
 
   return out;
 }
-
 function oneOffsForDate(dateISO, context='calendar'){
   const m = groupOneOffsByDay(dateISO, dateISO, context);
   return m.get(dateISO) || [];
