@@ -322,6 +322,7 @@ body{
 .bar.special{ background: rgba(120,90,30,0.12); color:#3f2e0d; }
 .bar.standard{ background: rgba(40,110,70,0.12); color:#0f3a27; }
 .bar.secondary{ background: rgba(27,107,111,0.07); }
+.bar.oneoff{ background: rgba(90,80,160,0.12); color:#2e2a6b; border-color: rgba(90,80,160,0.18); }
 .bar:hover{ border-color: rgba(27,107,111,0.25); }
 
 /* Month day cells */
