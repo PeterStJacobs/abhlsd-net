@@ -1749,6 +1749,8 @@ async function loadData(){
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
   let oneOffRes = null;
   try{ oneOffRes = await fetch('./data/AFdS_OneOff_StarSystems.csv'); }catch(e){ oneOffRes = null; }
+  let miavigRes = null;
+  try{ miavigRes = await fetch('./data/AFdS_MiAViG.csv'); }catch(e){ miavigRes = null; }
 
   state.data.config = await cfgRes.json();
   state.data.ranges = await rangesRes.json();
@@ -1763,11 +1765,16 @@ async function loadData(){
 
   // One-Off star systems (timestamped)
   let oneOffRaw = [];
+
   if(oneOffRes && oneOffRes.ok){
     const t = await oneOffRes.text();
-    oneOffRaw = parseCSV(t);
+    oneOffRaw = oneOffRaw.concat(parseCSV(t));
   }
 
+  if(miavigRes && miavigRes.ok){
+    const t = await miavigRes.text();
+    oneOffRaw = oneOffRaw.concat(parseCSV(t));
+  }
 
   const syByKey = new Map();
   const gyDefs = [];
@@ -1834,24 +1841,23 @@ async function loadData(){
     const seq = toInt(r.Sequence ?? r.sequence, 9999);
 
     const originTZ = String(r.Origin_TZ || r.origin_tz || 'America/Toronto').trim() || 'America/Toronto';
+    const durMin = toInt(r.Duration_Minutes ?? r.duration_minutes, 30) ?? 30;
+
     const originStr = r.Origin_Gregorian_Date || r.origin_gregorian_date || '';
     const dtOrigin = parseDateTimeFlexible(originStr, originTZ);
     if(!dtOrigin || !dtOrigin.isValid) continue;
 
-    // Optional End fields
-      const endStr = r.End_Gregorian_Date || r.end_gregorian_date || '';
-      const endTZ = String(r.End_TZ || r.end_tz || originTZ).trim() || originTZ;
-      const dtEnd = endStr ? parseDateTimeFlexible(endStr, endTZ) : null;
-
-    // Duration fallback
-    const durMin = toInt(r.Duration_Minutes ?? r.duration_minutes, 30) ?? 30;
+    // Optional end fields
+    const endStr = r.End_Gregorian_Date || r.end_gregorian_date || '';
+    const endTZ = String(r.End_TZ || r.end_tz || originTZ).trim() || originTZ;
+    const dtEnd = endStr ? parseDateTimeFlexible(endStr, endTZ) : null;
 
     const startUtcMs = dtOrigin.toUTC().toMillis();
     let endUtcMs;
 
     if(dtEnd && dtEnd.isValid){
       endUtcMs = dtEnd.toUTC().toMillis();
-      if(endUtcMs <= startUtcMs) continue; // guard bad rows
+      if(endUtcMs <= startUtcMs) continue; // guard
     } else {
       endUtcMs = dtOrigin.plus({minutes: durMin}).toUTC().toMillis();
     }
