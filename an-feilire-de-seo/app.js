@@ -283,6 +283,27 @@ function gregorianFromSeoian(dd, mm, yyyy){
   return target.toISODate();
 }
 
+// -------------New Functions ----------------
+function isMultiDayOneOff(def){
+  // treat as multi-day if marked allDay OR spans 24h+ OR crosses a local midnight
+  if(def.allDay) return true;
+  if((def.durationMinutes || 0) >= 1440) return true;
+
+  const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+  const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+  const lastDay = endLocal.minus({milliseconds:1}).toISODate();
+  return startLocal.toISODate() !== lastDay;
+}
+
+function oneOffSpanISO(def){
+  const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+  const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+
+  const startISO = startLocal.toISODate();
+  const endISO = endLocal.minus({milliseconds:1}).toISODate(); // end-exclusive safe
+  return { startISO, endISO };
+}
+
 // ---------- Rendering ----------
 const el = (id)=>document.getElementById(id);
 
@@ -395,7 +416,10 @@ function renderMonthView(){
 
     for(const p of placed){
       const bar = document.createElement('div');
-      bar.className = (p.kind === 'special') ? 'bar special' : (p.kind === 'standard' ? 'bar standard' : ('bar' + (p.lane === 1 ? ' secondary' : '')));
+      bar.className = (p.kind === 'special') ? 'bar special'
+        : (p.kind === 'standard' ? 'bar standard'
+        : (p.kind === 'oneoff' ? 'bar oneoff'
+        : ('bar' + (p.lane === 1 ? ' secondary' : ''))));
       bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
       bar.style.gridRow = `${p.lane+1}`;
       bar.textContent = p.label;
@@ -993,6 +1017,27 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
         end: occ,
         kind: isStandardCategory(def.category) ? 'standard' : isSpecialCategory(def.category) ? 'special' : 'other',
         rank: def.rank ?? 9,
+        sequence: def.sequence ?? 9999
+      });
+    }
+  }
+
+  // Multi-day One-Offs as spanning all-day bars (Priority after Standard)
+  if(state.filters.oneOff && state.data.oneOffDefs){
+    for(const def of state.data.oneOffDefs){
+      if(!def.showOnCalendar) continue;
+      if(!isMultiDayOneOff(def)) continue;
+
+      const span = oneOffSpanISO(def);
+      if(span.endISO < rangeStartISO || span.startISO > rangeEndISO) continue;
+
+      events.push({
+        id: `${def.id}_${span.startISO}`,
+        label: def.title,
+        start: span.startISO,
+        end: span.endISO,
+        kind: 'oneoff',        // new kind
+        rank: def.rank ?? 3,   // suggested
         sequence: def.sequence ?? 9999
       });
     }
