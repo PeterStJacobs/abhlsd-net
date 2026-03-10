@@ -7,7 +7,7 @@ Special_Meatloaf_Concert,50,Meatloaf Concert,The concert to which we won tickets
 Special_Graduation_Ball,60,Graduation Ball,The Night of the Graduation Ball,TRUE,SY,3,1,0001,1994-03-04,1994,TRUE,TRUE,FALSE,Special,1,3,4,,,
 Special_Royal_York_Day,70,Royal York Day,Our night at the Royal York,TRUE,SY,5,1,0001,1994-04-26,1994,TRUE,TRUE,FALSE,Special,1,4,26,,,
 Special_Europe_Day,80,Europe Day,The Day I flew to Europe,TRUE,SY,5,2,0001,1994-04-27,1994,TRUE,TRUE,FALSE,Special,1,4,27,,,
-Special_Constellation_Opens,90,Constellation Opens,"Mars in Aries, Venus in Gemini - Opens",TRUE,SY,5,26,0001,1994-05-21,1994,TRUE,TRUE,FALSE,Special,1,5,21,,,
+Special_Constellation_Opens,90,Constellation Opens,"Mars in Aries, Venus in Gemini - Opens",TRUE,SY,5,29,0001,1994-05-24,1994,TRUE,TRUE,FALSE,Special,1,5,24,,,
 Special_Return_Day,100,Return Day,The Day I returned from Europe,TRUE,SY,6,1,0001,1994-05-23,1994,TRUE,TRUE,FALSE,Special,1,5,23,,,
 Special_Leaving_Day,110,Leaving Day,The Day I left Toronto,TRUE,SY,7,1,0001,1994-06-03,1994,TRUE,TRUE,FALSE,Special,1,6,3,,,
 Special_Constellation_Closes,120,Constellation Closes,"Mars in Aries, Venus in Gemini - Closes",TRUE,SY,7,11,0001,1994-06-13,1994,TRUE,TRUE,FALSE,Special,1,6,13,,,
@@ -65,3 +65,4 @@ Standard_Global_Easter_Monday,490,Easter Monday,Variable - Monday after Easter,T
 ,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,,,,,,
+
