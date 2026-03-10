@@ -391,7 +391,7 @@ function renderMonthView(){
   const rangeEndISO = monthSeo.canonical ? monthSeo.canonical.end : dt.endOf('month').toISODate();
   const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
   const end = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
-  const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
+  const oneOffs = (oneOffByDay.get(dateISO) || []).filter(ev => !isMultiDayOneOff(ev));
   let cursor = start;
 
   while(cursor <= end){
@@ -639,6 +639,7 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
   
   for(const [dateISO, events] of byDay.entries()){
     for(const ev of events){
+      if(isMultiDayOneOff(ev)) continue;
       // split across hours if needed
       let start = ev.startLocal;
       let remainingMin = ev.durationMinutes || 30;
