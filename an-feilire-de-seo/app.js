@@ -769,15 +769,82 @@ function enabledForCategory(cat){
 }
 function enabledForOneOff(){ return !!state.filters.oneOff; }
 
-function syEventDefsForDate(dateISO){
-  if(!state.data.syByKey) return [];
-  const seo = canonicalSeoianDate(dateISO);
-  if(!seo.monthNo || !seo.day) return [];
-  const key = `${seo.monthNo}-${seo.day}`;
-  const arr = state.data.syByKey.get(key) || [];
-  return arr.filter(d => enabledForCategory(d.category) && (seo.year >= (d.syStartYear || 1)));
+function activeSeoianMonthDayPairs(dateISO){
+  // Returns all (monthNo, day) pairs that are valid for this Gregorian dateISO,
+  // across ALL active SuperMonths (overlaps allowed).
+  const act = activeSuperMonths(dateISO);
+  if(!act || act.length === 0) return [];
+
+  const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+
+  const pairs = [];
+  for(const r of act){
+    const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
+    const day = dUTC.diff(startUTC, 'days').days + 1;
+    const dayInt = Math.floor(day + 1e-9);
+
+    if(dayInt >= 1){
+      pairs.push({
+        monthNo: r.monthNo,
+        day: dayInt,
+        monthName: r.monthName,
+        start: r.start
+      });
+    }
+  }
+
+  // Stable ordering: earliest-started month first (older label first),
+  // then by month number
+  pairs.sort((a,b)=> a.start.localeCompare(b.start) || (a.monthNo - b.monthNo) || (a.day - b.day));
+
+  return pairs;
 }
 
+function syEventDefsForDate(dateISO){
+  if(!state.data.syByKey) return [];
+
+  const syYear = seoianYearForGregorian(dateISO);
+  const pairs = activeSeoianMonthDayPairs(dateISO);
+  if(pairs.length === 0) return [];
+
+  // Collect defs across all matching keys, de-dupe by id
+  const byId = new Map();
+
+  for(const p of pairs){
+    const key = `${p.monthNo}-${p.day}`;
+    const arr = state.data.syByKey.get(key) || [];
+
+    for(const def of arr){
+      // category filter + start year rule
+      if(!enabledForCategory(def.category)) continue;
+      if(syYear < (def.syStartYear || 1)) continue;
+
+      // de-dupe: keep the "best" version if duplicated (usually not needed, but safe)
+      const existing = byId.get(def.id);
+      if(!existing){
+        byId.set(def.id, def);
+      }else{
+        // prefer lower rank, then lower sequence
+        const er = existing.rank ?? 9, dr = def.rank ?? 9;
+        const es = existing.sequence ?? 9999, ds = def.sequence ?? 9999;
+        if(dr < er || (dr === er && ds < es)){
+          byId.set(def.id, def);
+        }
+      }
+    }
+  }
+
+  const out = Array.from(byId.values());
+
+  // Keep your existing ordering rules
+  out.sort((a,b)=>
+    (a.rank ?? 9) - (b.rank ?? 9) ||
+    (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
+    a.title.localeCompare(b.title)
+  );
+
+  return out;
+}
 function weekdayToLuxon(w){
   if(w === null || w === undefined) return null;
   const n = Number(w);
