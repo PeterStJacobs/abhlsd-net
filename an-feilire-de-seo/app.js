@@ -363,27 +363,30 @@ function renderMonthView(){
 
   const dt = DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ});
   const monthSeo = canonicalSeoianDate(state.focusDateISO);
+
   const rangeStartISO = monthSeo.canonical ? monthSeo.canonical.start : dt.startOf('month').toISODate();
-  const rangeEndISO = monthSeo.canonical ? monthSeo.canonical.end : dt.endOf('month').toISODate();
+  const rangeEndISO   = monthSeo.canonical ? monthSeo.canonical.end   : dt.endOf('month').toISODate();
 
   const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
-  const end = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
+  const end   = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
 
-  // Short one-offs (only) for month day-cells
+  // One-off events grouped by day in Display TZ
   const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
 
   let cursor = start;
 
   while(cursor <= end){
     const weekStart = cursor;
+
     const weekEl = document.createElement('div');
     weekEl.className = 'week';
 
+    // Bars (SuperMonths + Special + Standard + Multi-day OneOff bars)
     const barsEl = document.createElement('div');
     barsEl.className = 'month-bars';
 
     const weekStartISO = weekStart.setZone(state.displayTZ).toISODate();
-    const weekEndISO = weekStart.plus({days:6}).setZone(state.displayTZ).toISODate();
+    const weekEndISO   = weekStart.plus({days:6}).setZone(state.displayTZ).toISODate();
 
     const events = collectEventsForRange(weekStartISO, weekEndISO);
     const { placed, hiddenByDay } = placeEventsInWeek(events, weekStartISO, weekEndISO, 3);
@@ -391,10 +394,11 @@ function renderMonthView(){
     for(const p of placed){
       const bar = document.createElement('div');
       bar.className =
-        (p.kind === 'special') ? 'bar special' :
-        (p.kind === 'standard') ? 'bar standard' :
-        (p.kind === 'oneoff') ? 'bar oneoff' :
-        ('bar' + (p.lane === 1 ? ' secondary' : ''));
+        (p.kind === 'special') ? 'bar special'
+        : (p.kind === 'standard') ? 'bar standard'
+        : (p.kind === 'oneoff') ? 'bar oneoff'
+        : ('bar' + (p.lane === 1 ? ' secondary' : ''));
+
       bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
       bar.style.gridRow = `${p.lane+1}`;
       bar.textContent = p.label;
@@ -404,6 +408,7 @@ function renderMonthView(){
 
     weekEl.appendChild(barsEl);
 
+    // Days grid
     const daysEl = document.createElement('div');
     daysEl.className = 'week-days';
 
@@ -419,29 +424,28 @@ function renderMonthView(){
       if(dateISO === todayISO) day.classList.add('today');
       if(state.highlightDateISO && dateISO === state.highlightDateISO) day.classList.add('highlight');
 
+      // Grey out days outside canonical supermonth range
       if(monthSeo.canonical){
         const inRange = (dateISO >= rangeStartISO && dateISO <= rangeEndISO);
         if(!inRange) day.classList.add('outside');
       }
 
+      // Seoian label only (Gregorian day numbers removed)
       const seo = canonicalSeoianDate(dateISO);
       const sd = document.createElement('div');
       sd.className = 'sd';
       sd.textContent = (seo.label === '—') ? '' : seo.label;
       day.appendChild(sd);
 
-      const g = document.createElement('div');
-      g.className = 'g';
-      g.textContent = dayDT.day;
-      day.appendChild(g);
+      // Timed one-offs in cell (exclude multi-day)
+      const allOneOffs = oneOffByDay.get(dateISO) || [];
+      const timedOneOffs = allOneOffs.filter(ev => !isMultiDayOneOff(ev));
 
-      // Short one-offs in cell
-      const oneOffs = oneOffByDay.get(dateISO) || [];
       const MAX_TIMED_VISIBLE = 2;
-      if(oneOffs.length){
+      if(timedOneOffs.length){
         const items = document.createElement('div');
         items.className = 'day-items';
-        oneOffs.slice(0, MAX_TIMED_VISIBLE).forEach(ev=>{
+        timedOneOffs.slice(0, MAX_TIMED_VISIBLE).forEach(ev=>{
           const row = document.createElement('div');
           row.className = 'day-item';
           const t = document.createElement('span');
@@ -456,8 +460,9 @@ function renderMonthView(){
         day.appendChild(items);
       }
 
+      // +more counts: hidden bars + hidden timed
       const hiddenBars = hiddenByDay.get(dateISO) || 0;
-      const hiddenTimed = Math.max(0, oneOffs.length - MAX_TIMED_VISIBLE);
+      const hiddenTimed = Math.max(0, timedOneOffs.length - MAX_TIMED_VISIBLE);
       const hiddenCount = hiddenBars + hiddenTimed;
 
       if(hiddenCount > 0){
@@ -1295,14 +1300,15 @@ function openMorePopover(dateISO, anchorEl){
 
   body.innerHTML = '';
 
+  // Build the list (strict priority): SuperMonths → Special → Standard → One-Off (timed only)
   const periods = activePeriodsForISO(dateISO);
   const defs = allDayDefsForDate(dateISO);
   const items = [];
 
-  // SuperMonths
+  // SuperMonths (Priority 0)
   periods.forEach(p => items.push({ label: p.name, kind: 'period' }));
 
-  // Special/Standard all-day
+  // All-day events (Special → Standard → Other)
   const specials = defs.filter(d=> isSpecialCategory(d.category));
   const standards = defs.filter(d=> isStandardCategory(d.category));
   const others = defs.filter(d=> !isSpecialCategory(d.category) && !isStandardCategory(d.category));
@@ -1311,15 +1317,11 @@ function openMorePopover(dateISO, anchorEl){
   standards.forEach(d => items.push({ label: d.title, kind: 'standard' }));
   others.forEach(d => items.push({ label: d.title, kind: 'other' }));
 
-  // Multi-day one-offs (bars) and short one-offs (timed)
-  if(state.filters.oneOff && state.data.oneOffDefs){
-    const allOneOffs = oneOffsForDate(dateISO, 'list'); // includes multi-day
-    const multi = allOneOffs.filter(ev=> isMultiDayOneOff(ev));
-    const short = allOneOffs.filter(ev=> !isMultiDayOneOff(ev));
-
-    multi.forEach(ev => items.push({ label: ev.title, kind:'oneoff' }));
-    short.forEach(ev => items.push({ label: `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`, kind:'oneoff' }));
-  }
+  // One-Off timed events ONLY (exclude multi-day/all-day one-offs which are already bars)
+  const oneOffs = oneOffsForDate(dateISO, 'calendar').filter(ev => !isMultiDayOneOff(ev));
+  oneOffs.forEach(ev => {
+    items.push({ label: `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`, kind: 'oneoff' });
+  });
 
   if(!items.length){
     const empty = document.createElement('div');
@@ -1336,6 +1338,7 @@ function openMorePopover(dateISO, anchorEl){
     });
   }
 
+  // Position near anchor
   const r = anchorEl?.getBoundingClientRect?.();
   const margin = 10;
   const width = 320;
@@ -1352,8 +1355,11 @@ function openMorePopover(dateISO, anchorEl){
   pop.hidden = false;
 
   const closeBtn = el('moreClose');
-  if(closeBtn) closeBtn.onclick = () => closeMorePopover();
+  if(closeBtn){
+    closeBtn.onclick = () => closeMorePopover();
+  }
 
+  // Click outside to close
   setTimeout(() => {
     const onDoc = (ev) => {
       if(pop.hidden) return;
