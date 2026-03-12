@@ -142,6 +142,31 @@ function seoianYearForGregorian(dateISO){
   return y - 1994;
 }
 
+function seoianLabelWithOverlaps(dateISO){
+  const sy = seoianYearForGregorian(dateISO);
+  const act = activeSuperMonths(dateISO);
+  if(!act || act.length === 0) return '—';
+
+  // Build all labels for each active month
+  const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+  const labels = act.map(r=>{
+    const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
+    const day = dUTC.diff(startUTC, 'days').days + 1;
+    const dayInt = Math.floor(day + 1e-9);
+    return {
+      start: r.start,
+      label: `${pad2(dayInt)}/${pad2(r.monthNo)}/${String(sy).padStart(4,'0')}`
+    };
+  });
+
+  // canonical = most recently started month
+  labels.sort((a,b)=> a.start.localeCompare(b.start)); // oldest → newest
+  const canonical = labels[labels.length - 1];
+  const overlaps = labels.slice(0, -1).map(x=>x.label);
+
+  return overlaps.length ? `${canonical.label} | ${overlaps.join(' | ')}` : canonical.label;
+}
+
 function dateISOFromDMY(dmy){
   const m = dmy.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if(!m) return null;
@@ -434,7 +459,8 @@ function renderMonthView(){
       const seo = canonicalSeoianDate(dateISO);
       const sd = document.createElement('div');
       sd.className = 'sd';
-      sd.textContent = (seo.label === '—') ? '' : seo.label;
+      sd.textContent = seoianLabelWithOverlaps(dateISO);
+      if(sd.textContent === '—') sd.textContent = '';
       day.appendChild(sd);
 
       // Timed one-offs in cell (exclude multi-day)
@@ -517,7 +543,8 @@ function renderWeekView(){
 
     const main = document.createElement('div');
     main.className = 'week-dow-main';
-    main.textContent = seo.canonical ? `${DOW[i]} ${seo.label}` : `${DOW[i]}`;
+    const label = seoianLabelWithOverlaps(dateISO);
+    main.textContent = (label && label !== '—') ? `${DOW[i]} ${label}` : `${DOW[i]}`;
     cell.appendChild(main);
 
     if(showGreg){
@@ -1194,7 +1221,7 @@ function renderInspector(){
     return;
   }
 
-  el('inspectorSeoian').textContent = snap.seoianLabel;
+  el('inspectorSeoian').textContent = seoianLabelWithOverlaps(snap.dateISO);
   el('inspectorGregorian').textContent = snap.gregorianLabel;
 
   const p = el('inspectorPeriods');
