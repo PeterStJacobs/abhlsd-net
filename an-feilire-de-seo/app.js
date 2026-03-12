@@ -517,7 +517,8 @@ function renderMonthView(){
       const seo = canonicalSeoianDate(dateISO);
       const sd = document.createElement('div');
       sd.className = 'sd';
-      sd.textContent = (seo.label === '—') ? '' : seo.label;
+      sd.textContent = seoianLabelWithOverlaps(dateISO);
+      if(sd.textContent === '—') sd.textContent = '';
       day.appendChild(sd);
 
       // Timed one-offs in cell (short only)
