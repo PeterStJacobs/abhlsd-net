@@ -426,7 +426,7 @@ function renderMonthView(){
   const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
   const end   = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
 
-  // One-off events grouped by day in Display TZ
+  // Timed (short) one-offs only for month cells
   const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
 
   let cursor = start;
@@ -437,32 +437,59 @@ function renderMonthView(){
     const weekEl = document.createElement('div');
     weekEl.className = 'week';
 
-    // Bars (SuperMonths + Special + Standard + Multi-day OneOff bars)
-    const barsEl = document.createElement('div');
-    barsEl.className = 'month-bars';
-
     const weekStartISO = weekStart.setZone(state.displayTZ).toISODate();
     const weekEndISO   = weekStart.plus({days:6}).setZone(state.displayTZ).toISODate();
 
-    const events = collectEventsForRange(weekStartISO, weekEndISO);
-    const { placed, hiddenByDay } = placeEventsInWeek(events, weekStartISO, weekEndISO, 3);
+    const allEvents = collectEventsForRange(weekStartISO, weekEndISO);
 
-    for(const p of placed){
-      const bar = document.createElement('div');
-      bar.className =
-        (p.kind === 'special') ? 'bar special'
-        : (p.kind === 'standard') ? 'bar standard'
-        : (p.kind === 'oneoff') ? 'bar oneoff'
-        : ('bar' + (p.lane === 1 ? ' secondary' : ''));
+    // Tier split:
+    const tierSuper = allEvents.filter(e => e.kind === 'supermonth');
+    const tierOneOff = allEvents.filter(e => e.kind === 'oneoff'); // multi-day one-offs only (by construction)
+    const tierOther = allEvents.filter(e => e.kind !== 'supermonth' && e.kind !== 'oneoff');
 
-      bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
-      bar.style.gridRow = `${p.lane+1}`;
-      bar.textContent = p.label;
-      bar.title = p.label;
-      barsEl.appendChild(bar);
+    // Hidden counts accumulate across tiers
+    const hiddenByDay = new Map();
+    const addHidden = (m)=>{
+      for(const [k,v] of m.entries()){
+        hiddenByDay.set(k, (hiddenByDay.get(k) || 0) + v);
+      }
+    };
+
+    function renderTier(events, maxLanes){
+      if(!events.length) return null;
+      const tier = document.createElement('div');
+      tier.className = 'month-bars';
+
+      const { placed, hiddenByDay: hid } = placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes);
+      addHidden(hid);
+
+      for(const p of placed){
+        const bar = document.createElement('div');
+        bar.className =
+          (p.kind === 'special') ? 'bar special'
+          : (p.kind === 'standard') ? 'bar standard'
+          : (p.kind === 'oneoff') ? 'bar oneoff'
+          : (p.kind === 'supermonth') ? 'bar'
+          : 'bar';
+
+        bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
+        bar.style.gridRow = `${p.lane+1}`;
+        bar.textContent = p.label;
+        bar.title = p.label;
+        tier.appendChild(bar);
+      }
+
+      return tier;
     }
 
-    weekEl.appendChild(barsEl);
+    // Render tiers in strict order
+    const t1 = renderTier(tierSuper, 3);  // SuperMonths
+    const t2 = renderTier(tierOneOff, 2); // Multi-day One-Offs
+    const t3 = renderTier(tierOther, 3);  // Special/Standard/etc
+
+    if(t1) weekEl.appendChild(t1);
+    if(t2) weekEl.appendChild(t2);
+    if(t3) weekEl.appendChild(t3);
 
     // Days grid
     const daysEl = document.createElement('div');
@@ -486,23 +513,21 @@ function renderMonthView(){
         if(!inRange) day.classList.add('outside');
       }
 
-      // Seoian label only (Gregorian day numbers removed)
+      // Seoian label (your new overlap format should already be in use here)
       const seo = canonicalSeoianDate(dateISO);
       const sd = document.createElement('div');
       sd.className = 'sd';
-      sd.textContent = seoianLabelWithOverlaps(dateISO);
-      if(sd.textContent === '—') sd.textContent = '';
+      sd.textContent = (seo.label === '—') ? '' : seo.label;
       day.appendChild(sd);
 
-      // Timed one-offs in cell (exclude multi-day)
-      const allOneOffs = oneOffByDay.get(dateISO) || [];
-      const timedOneOffs = allOneOffs.filter(ev => !isMultiDayOneOff(ev));
-
+      // Timed one-offs in cell (short only)
+      const timed = (oneOffByDay.get(dateISO) || []).filter(ev => !isMultiDayOneOff(ev));
       const MAX_TIMED_VISIBLE = 2;
-      if(timedOneOffs.length){
+
+      if(timed.length){
         const items = document.createElement('div');
         items.className = 'day-items';
-        timedOneOffs.slice(0, MAX_TIMED_VISIBLE).forEach(ev=>{
+        timed.slice(0, MAX_TIMED_VISIBLE).forEach(ev=>{
           const row = document.createElement('div');
           row.className = 'day-item';
           const t = document.createElement('span');
@@ -517,9 +542,8 @@ function renderMonthView(){
         day.appendChild(items);
       }
 
-      // +more counts: hidden bars + hidden timed
       const hiddenBars = hiddenByDay.get(dateISO) || 0;
-      const hiddenTimed = Math.max(0, timedOneOffs.length - MAX_TIMED_VISIBLE);
+      const hiddenTimed = Math.max(0, timed.length - MAX_TIMED_VISIBLE);
       const hiddenCount = hiddenBars + hiddenTimed;
 
       if(hiddenCount > 0){
@@ -550,7 +574,6 @@ function renderMonthView(){
 
   return wrap;
 }
-
 function renderWeekView(){
   const wrap = document.createElement('div');
   wrap.className = 'week';
