@@ -315,72 +315,70 @@ function setUpTZList(){
   try{
     zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
   }catch(e){ zones = []; }
+
   if(!zones || zones.length === 0){
-    zones = [DEFAULTS.tamaraTZ, DEFAULTS.martinTZ, 'America/Toronto', 'UTC', 'Europe/London', 'Asia/Tokyo'];
+    zones = [
+      DEFAULTS.tamaraTZ,
+      DEFAULTS.martinTZ,
+      'America/Toronto',
+      'UTC',
+      'Europe/London',
+      'Asia/Tokyo'
+    ];
   }
 
-  const fillSelect = (sel, currentVal)=>{
+  const pinned = ['America/Phoenix', 'America/Toronto', 'Australia/Brisbane'];
+
+  function fillSelectPinned(sel, currentVal, fallbackVal){
     if(!sel) return;
     sel.innerHTML = '';
-    const frag = document.createDocumentFragment();
-    for(const z of zones){
+
+    const zonesSet = new Set(zones);
+
+    // Pinned first (if supported)
+    for(const z of pinned){
+      if(!zonesSet.has(z)) continue;
       const opt = document.createElement('option');
       opt.value = z;
       opt.textContent = z;
-      frag.appendChild(opt);
+      sel.appendChild(opt);
     }
-    sel.appendChild(frag);
-    sel.value = currentVal;
+
+    // Separator
+    const sep = document.createElement('option');
+    sep.value = '';
+    sep.textContent = '-------------------';
+    sep.disabled = true;
+    sel.appendChild(sep);
+
+    // Rest
+    for(const z of zones){
+      if(pinned.includes(z)) continue;
+      const opt = document.createElement('option');
+      opt.value = z;
+      opt.textContent = z;
+      sel.appendChild(opt);
+    }
+
+    // Select current (or fallback)
+    sel.value = currentVal || '';
     if(!sel.value){
-      sel.value = zones.includes(DEFAULTS.tamaraTZ) ? DEFAULTS.tamaraTZ : zones[0];
+      const fb = (fallbackVal && zonesSet.has(fallbackVal))
+        ? fallbackVal
+        : (pinned.find(z=>zonesSet.has(z)) || zones[0] || 'UTC');
+      sel.value = fb;
     }
-  };
+  }
 
-  fillSelect(el('tzTamara'), state.tamaraTZ);
-  fillSelect(el('tzMartin'), state.martinTZ);
+  // Eastern/Western TZ dropdowns
+  fillSelectPinned(el('tzTamara'), state.tamaraTZ, DEFAULTS.tamaraTZ);
+  fillSelectPinned(el('tzMartin'), state.martinTZ, DEFAULTS.martinTZ);
 
-// Display TZ selector (pin common zones on top)
-const displaySel = el('displayTZ');
-displaySel.innerHTML = '';
+  // Display TZ dropdown
+  fillSelectPinned(el('displayTZ'), state.displayTZ, state.displayTZ);
 
-const pinned = ['America/Phoenix', 'America/Toronto', 'Australia/Brisbane'];
-const zonesSet = new Set(zones);
-
-// Add pinned items first (only if they exist in supported list)
-for(const z of pinned){
-  if(!zonesSet.has(z)) continue;
-  const opt = document.createElement('option');
-  opt.value = z;
-  opt.textContent = z;
-  if(z === state.displayTZ) opt.selected = true;
-  displaySel.appendChild(opt);
-}
-
-// Separator (disabled option)
-const sep = document.createElement('option');
-sep.value = '';
-sep.textContent = '-------------------';
-sep.disabled = true;
-displaySel.appendChild(sep);
-
-// Add the rest (excluding pinned)
-for(const z of zones){
-  if(pinned.includes(z)) continue;
-  const opt = document.createElement('option');
-  opt.value = z;
-  opt.textContent = z;
-  if(z === state.displayTZ) opt.selected = true;
-  displaySel.appendChild(opt);
-}
-
-// If current displayTZ wasn't in the list (rare), fall back to first pinned or first zone
-if(!displaySel.value){
-  const fallback = pinned.find(z=>zonesSet.has(z)) || zones[0] || 'UTC';
-  state.displayTZ = fallback;
-  displaySel.value = fallback;
-}
-
-ensureEastWestOrder();
+  // Enforce East/West order in UI after population
+  ensureEastWestOrder();
 }
 
 function render(){
