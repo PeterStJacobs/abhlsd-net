@@ -41,6 +41,7 @@ const state = {
     syByKey: null,
     gyDefs: null,
     oneOffDefs: null,
+    silentsounds: null,
   }
 };
 
@@ -305,6 +306,28 @@ function oneOffSpanISO(def){
     startISO: startLocal.toISODate(),
     endISO: endLocal.minus({milliseconds:1}).toISODate()
   };
+}
+
+// ---------- Silent Sounds (Song of the Day) ----------
+
+function hash32_FNV1a(str){
+  // 32-bit FNV-1a
+  let h = 0x811c9dc5;
+  for(let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h = (h + ((h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24))) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function silentSoundForDate(dateISO){
+  const songs = state.data.silentSounds;
+  if(!songs || songs.length === 0) return null;
+
+  // Deterministic per Gregorian day (spreads usage across all years)
+  const key = `SilentSounds|${dateISO}`;
+  const idx = hash32_FNV1a(key) % songs.length;
+  return songs[idx];
 }
 
 // ---------- Rendering ----------
@@ -1243,6 +1266,8 @@ function snapshotDay(dateISO){
     ? oneOffsForDate(dateISO, 'inspector')
     : [];
 
+  const silentSong = silentSoundForDate(dateISO);
+
   state.snapshot = {
     dateISO,
     seoianLabel: seo.label,
@@ -1250,6 +1275,7 @@ function snapshotDay(dateISO){
     specialDays,
     standardDays,
     oneOffs,
+    silentSong,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
     tzAtSnapshot: { tamaraTZ: state.tamaraTZ, martinTZ: state.martinTZ }
@@ -1367,6 +1393,30 @@ function renderInspector(){
       p.appendChild(div);
     }
   }
+
+  // Silent Sounds: Song of the Day
+if(snap.silentSong){
+  any = true;
+  const div = document.createElement('div');
+  div.className = 'eventitem songofday';
+
+  const t = document.createElement('div');
+  t.className = 'title';
+  t.textContent = 'Silent Sounds (Song of the Day)';
+  div.appendChild(t);
+
+  const a = document.createElement('a');
+  a.href = snap.silentSong.url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  a.className = 'songlink';
+  a.textContent = snap.silentSong.artists
+    ? `${snap.silentSong.title} — ${snap.silentSong.artists}`
+    : snap.silentSong.title;
+  div.appendChild(a);
+
+  p.appendChild(div);
+}
 
   if(!any) p.innerHTML = '<div class="muted">(no periods)</div>';
 
@@ -1872,6 +1922,7 @@ async function loadData(){
   const cfgRes = await fetch('./data/supermonths_config.json');
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
+  const silentRes = await fetch('./data/AFdS_Silent_Sounds.csv');
 
   let oneOffRes = null;
   try{ oneOffRes = await fetch('./data/AFdS_OneOff_StarSystems.csv'); }catch(e){ oneOffRes = null; }
@@ -1888,6 +1939,26 @@ async function loadData(){
   state.data.nameByMonthNo = idx.nameByMonthNo;
 
   const raw = parseCSV(await daysRes.text());
+
+  // Silent Sounds playlist (394)
+const silentText = await silentRes.text();
+const silentRaw = parseCSV(silentText);
+
+const silentSounds = [];
+for(const r of silentRaw){
+  const url = (r['Spotify URL'] || r.Spotify_URL || r.spotify_url || '').trim();
+  const title = (r['Song Title'] || r.Song_Title || r.title || '').trim();
+  const artists = (r['Artists'] || r.Artist || r.artists || '').trim();
+
+  if(!url) continue;
+  silentSounds.push({
+    url,
+    title: title || 'Spotify Track',
+    artists: artists || ''
+  });
+}
+
+state.data.silentSounds = silentSounds;
 
   let oneOffRaw = [];
   if(oneOffRes && oneOffRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await oneOffRes.text()));
