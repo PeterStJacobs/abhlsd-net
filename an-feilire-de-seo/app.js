@@ -1,4 +1,4 @@
-const { DateTime, Interval } = luxon;
+const { DateTime } = luxon;
 
 const TZKEY_MAP = {
   ET_Toronto: 'America/Toronto',
@@ -41,7 +41,7 @@ const state = {
     syByKey: null,
     gyDefs: null,
     oneOffDefs: null,
-    silentsounds: null,
+    silentSounds: null,
   }
 };
 
@@ -51,53 +51,67 @@ function parseCSV(text){
   let row = [];
   let cur = '';
   let inQuotes = false;
+
   for(let i=0;i<text.length;i++){
     const ch = text[i];
     const next = text[i+1];
+
     if(inQuotes){
       if(ch === '"' && next === '"'){ cur += '"'; i++; continue; }
       if(ch === '"'){ inQuotes = false; continue; }
       cur += ch;
       continue;
     }
+
     if(ch === '"'){ inQuotes = true; continue; }
     if(ch === ','){ row.push(cur); cur=''; continue; }
+
     if(ch === '\r'){
       if(next === '\n') i++;
       row.push(cur); cur='';
-      if(row.length>1 || row[0]!=='' ) rows.push(row);
-      row=[];
+      if(row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
       continue;
     }
+
     if(ch === '\n'){
       row.push(cur); cur='';
-      if(row.length>1 || row[0]!=='' ) rows.push(row);
-      row=[];
+      if(row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
       continue;
     }
+
     cur += ch;
   }
+
   row.push(cur);
-  if(row.length>1 || row[0]!=='' ) rows.push(row);
-  if(rows.length===0) return [];
-  const headers = rows[0].map(h=>h.trim());
-  if(headers.length && headers[0].startsWith('\ufeff')) headers[0] = headers[0].replace(/^\ufeff/, '');
+  if(row.length > 1 || row[0] !== '') rows.push(row);
+  if(rows.length === 0) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  if(headers.length && headers[0].startsWith('\ufeff')){
+    headers[0] = headers[0].replace(/^\ufeff/, '');
+  }
+
   const out = [];
   for(let r=1;r<rows.length;r++){
-    if(rows[r].every(v=>String(v).trim()==='')) continue;
+    if(rows[r].every(v => String(v).trim() === '')) continue;
     const obj = {};
     for(let c=0;c<headers.length;c++){
       obj[headers[c]] = (rows[r][c] ?? '').trim();
     }
     out.push(obj);
   }
+
   return out;
 }
+
 function toBool(v){
   if(typeof v === 'boolean') return v;
   const s = String(v ?? '').trim().toLowerCase();
-  return (s==='true' || s==='1' || s==='yes' || s==='y');
+  return (s === 'true' || s === '1' || s === 'yes' || s === 'y');
 }
+
 function toBoolDefault(v, def){
   const s = String(v ?? '').trim();
   if(s === '') return def;
@@ -109,7 +123,7 @@ function isSpecialCategory(c){ return categoryKey(c).startsWith('special'); }
 function isStandardCategory(c){ return categoryKey(c).startsWith('standard'); }
 
 function toInt(v, def=null){
-  const n = parseInt(String(v ?? '').trim(),10);
+  const n = parseInt(String(v ?? '').trim(), 10);
   return Number.isFinite(n) ? n : def;
 }
 
@@ -122,30 +136,37 @@ function parseMonthDayFlexible(s){
 function parseDateTimeFlexible(s, zone){
   const str = String(s ?? '').trim();
   if(!str) return null;
+
   let dt = null;
+
   if(str.includes('T')){
     dt = DateTime.fromISO(str, {zone});
     if(dt.isValid) return dt;
   }
+
   dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm:ss', {zone});
   if(dt.isValid) return dt;
+
   dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm', {zone});
   if(dt.isValid) return dt;
+
   dt = DateTime.fromISO(str, {zone});
   if(dt.isValid) return dt;
+
   return null;
 }
 
 function fmtTimeHHMM(dt){ return dt.toFormat('HH:mm'); }
 function pad2(n){ return String(n).padStart(2,'0'); }
+
 function fmtGreg(dateISO){
-  const [y,m,d]=dateISO.split('-').map(Number);
+  const [y,m,d] = dateISO.split('-').map(Number);
   return `${pad2(d)}/${pad2(m)}/${y}`;
 }
 
 function seoianYearForGregorian(dateISO){
-  const [y,m,d]=dateISO.split('-').map(Number);
-  if (m>1 || (m===1 && d>=19)) return y - 1993;
+  const [y,m,d] = dateISO.split('-').map(Number);
+  if(m > 1 || (m === 1 && d >= 19)) return y - 1993;
   return y - 1994;
 }
 
@@ -154,9 +175,8 @@ function seoianLabelWithOverlaps(dateISO){
   const act = activeSuperMonths(dateISO);
   if(!act || act.length === 0) return '—';
 
-  // Build all labels for each active month
   const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
-  const labels = act.map(r=>{
+  const labels = act.map(r => {
     const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
     const day = dUTC.diff(startUTC, 'days').days + 1;
     const dayInt = Math.floor(day + 1e-9);
@@ -166,10 +186,9 @@ function seoianLabelWithOverlaps(dateISO){
     };
   });
 
-  // canonical = most recently started month
-  labels.sort((a,b)=> a.start.localeCompare(b.start)); // oldest → newest
+  labels.sort((a,b)=> a.start.localeCompare(b.start));
   const canonical = labels[labels.length - 1];
-  const overlaps = labels.slice(0, -1).map(x=>x.label);
+  const overlaps = labels.slice(0, -1).map(x => x.label);
 
   return overlaps.length ? `${canonical.label} | ${overlaps.join(' | ')}` : canonical.label;
 }
@@ -177,7 +196,11 @@ function seoianLabelWithOverlaps(dateISO){
 function dateISOFromDMY(dmy){
   const m = dmy.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if(!m) return null;
-  const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+
+  const d = Number(m[1]);
+  const mo = Number(m[2]);
+  const y = Number(m[3]);
+
   const dt = DateTime.fromObject({year:y, month:mo, day:d}, {zone:'UTC'});
   if(!dt.isValid) return null;
   return dt.toISODate();
@@ -187,11 +210,15 @@ function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 function roundHalfUp(x){ return Math.floor(x + 0.5); }
 
 function eastWestZones(dateISO, tzA, tzB){
-  if (tzA === tzB) return { east: tzA, west: tzA, same:true };
+  if(tzA === tzB) return { east: tzA, west: tzA, same:true };
+
   const a = DateTime.fromISO(dateISO, {zone:tzA}).startOf('day');
   const b = DateTime.fromISO(dateISO, {zone:tzB}).startOf('day');
-  if (a.offset === b.offset) return { east: tzA, west: tzA, same:true };
-  return (a.offset > b.offset) ? { east: tzA, west: tzB, same:false } : { east: tzB, west: tzA, same:false };
+
+  if(a.offset === b.offset) return { east: tzA, west: tzA, same:true };
+  return (a.offset > b.offset)
+    ? { east: tzA, west: tzB, same:false }
+    : { east: tzB, west: tzA, same:false };
 }
 
 function superDayBounds(dateISO, tzA, tzB){
@@ -221,21 +248,21 @@ function superDayFactsForDate(dateISO, easternTZ, westernTZ){
 }
 
 function durationToHHMM(ms){
-  const totalMin = Math.floor(ms/60000);
-  const h = Math.floor(totalMin/60);
-  const m = totalMin%60;
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
   return `${h}:${pad2(m)}`;
 }
 
 function ceilToHalfHourHours(hours){
-  return Math.ceil(hours*2)/2;
+  return Math.ceil(hours * 2) / 2;
 }
 
 function durationToHHMMCeilHalfHour(ms){
-  const totalMin = ms/60000;
-  const roundedMin = Math.ceil(totalMin/30)*30;
-  const h = Math.floor(roundedMin/60);
-  const m = roundedMin%60;
+  const totalMin = ms / 60000;
+  const roundedMin = Math.ceil(totalMin / 30) * 30;
+  const h = Math.floor(roundedMin / 60);
+  const m = roundedMin % 60;
   return `${h}:${pad2(m)}`;
 }
 
@@ -249,15 +276,19 @@ function buildRangesIndex(ranges){
   const byYear = new Map();
   const monthNoByName = new Map();
   const nameByMonthNo = new Map();
+
   for(const r of ranges){
     monthNoByName.set(r.monthName, r.monthNo);
     nameByMonthNo.set(r.monthNo, r.monthName);
+
     if(!byYear.has(r.seoianYear)) byYear.set(r.seoianYear, []);
     byYear.get(r.seoianYear).push(r);
   }
-  for(const [k, arr] of byYear.entries()){
-    arr.sort((a,b)=>a.start.localeCompare(b.start));
+
+  for(const [, arr] of byYear.entries()){
+    arr.sort((a,b)=> a.start.localeCompare(b.start));
   }
+
   return { byYear, monthNoByName, nameByMonthNo };
 }
 
@@ -276,13 +307,17 @@ function getRangeForMonth(seoYear, monthNo){
 function canonicalSeoianDate(dateISO){
   const sy = seoianYearForGregorian(dateISO);
   const act = activeSuperMonths(dateISO);
+
   if(act.length === 0){
     return { label: '—', year: sy, monthNo: null, day: null, canonical: null, active: [] };
   }
+
   const canonical = act.reduce((best, cur) => (cur.start > best.start ? cur : best), act[0]);
-  const day = DateTime.fromISO(dateISO, {zone:'UTC'}).diff(DateTime.fromISO(canonical.start, {zone:'UTC'}), 'days').days + 1;
+  const day = DateTime.fromISO(dateISO, {zone:'UTC'})
+    .diff(DateTime.fromISO(canonical.start, {zone:'UTC'}), 'days').days + 1;
   const dayInt = Math.floor(day + 1e-9);
   const label = `${pad2(dayInt)}/${pad2(canonical.monthNo)}/${String(sy).padStart(4,'0')}`;
+
   return { label, year: sy, monthNo: canonical.monthNo, day: dayInt, canonical, active: act };
 }
 
@@ -290,9 +325,11 @@ function gregorianFromSeoian(dd, mm, yyyy){
   const arr = state.data.rangesBySeoYear.get(yyyy) || [];
   const r = arr.find(x => x.monthNo === mm);
   if(!r) return null;
+
   const start = DateTime.fromISO(r.start, {zone:'UTC'});
-  const target = start.plus({days: dd-1});
+  const target = start.plus({days: dd - 1});
   if(target.toISODate() > r.end) return null;
+
   return target.toISODate();
 }
 
@@ -300,14 +337,18 @@ function gregorianFromSeoian(dd, mm, yyyy){
 function isMultiDayOneOff(def){
   if(def.allDay) return true;
   if((def.durationMinutes || 0) >= 1440) return true;
+
   const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
   const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
   const lastDay = endLocal.minus({milliseconds:1}).toISODate();
+
   return startLocal.toISODate() !== lastDay;
 }
+
 function oneOffSpanISO(def){
   const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
   const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+
   return {
     startISO: startLocal.toISODate(),
     endISO: endLocal.minus({milliseconds:1}).toISODate()
@@ -315,9 +356,7 @@ function oneOffSpanISO(def){
 }
 
 // ---------- Silent Sounds (Song of the Day) ----------
-
 function hash32_FNV1a(str){
-  // 32-bit FNV-1a
   let h = 0x811c9dc5;
   for(let i=0;i<str.length;i++){
     h ^= str.charCodeAt(i);
@@ -330,7 +369,6 @@ function silentSoundForDate(dateISO){
   const songs = state.data.silentSounds;
   if(!songs || songs.length === 0) return null;
 
-  // Deterministic per Gregorian day (spreads usage across all years)
   const key = `SilentSounds|${dateISO}`;
   const idx = hash32_FNV1a(key) % songs.length;
   return songs[idx];
@@ -341,9 +379,12 @@ const el = (id)=>document.getElementById(id);
 
 function setUpTZList(){
   let zones = [];
+
   try{
     zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
-  }catch(e){ zones = []; }
+  }catch(e){
+    zones = [];
+  }
 
   if(!zones || zones.length === 0){
     zones = [
@@ -364,7 +405,6 @@ function setUpTZList(){
 
     const zonesSet = new Set(zones);
 
-    // Pinned first (if supported)
     for(const z of pinned){
       if(!zonesSet.has(z)) continue;
       const opt = document.createElement('option');
@@ -373,14 +413,12 @@ function setUpTZList(){
       sel.appendChild(opt);
     }
 
-    // Separator
     const sep = document.createElement('option');
     sep.value = '';
     sep.textContent = '-------------------';
     sep.disabled = true;
     sel.appendChild(sep);
 
-    // Rest
     for(const z of zones){
       if(pinned.includes(z)) continue;
       const opt = document.createElement('option');
@@ -389,7 +427,6 @@ function setUpTZList(){
       sel.appendChild(opt);
     }
 
-    // Select current (or fallback)
     sel.value = currentVal || '';
     if(!sel.value){
       const fb = (fallbackVal && zonesSet.has(fallbackVal))
@@ -399,25 +436,23 @@ function setUpTZList(){
     }
   }
 
-  // Eastern/Western TZ dropdowns
   fillSelectPinned(el('tzTamara'), state.tamaraTZ, DEFAULTS.tamaraTZ);
   fillSelectPinned(el('tzMartin'), state.martinTZ, DEFAULTS.martinTZ);
-
-  // Display TZ dropdown
   fillSelectPinned(el('displayTZ'), state.displayTZ, state.displayTZ);
 
-  // Enforce East/West order in UI after population
   ensureEastWestOrder();
 }
 
 function render(){
   closeMorePopover();
+
   const seo = canonicalSeoianDate(state.focusDateISO);
   if(seo.canonical){
     el('calTitle').textContent = `${seo.canonical.monthName}, ${String(seo.year).padStart(4,'0')}`;
   }else{
     el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
   }
+
   renderCenter();
   renderInspector();
   renderMobileSheetMirrors();
@@ -426,6 +461,7 @@ function render(){
 function renderCenter(){
   const surf = el('calSurface');
   surf.innerHTML = '';
+
   if(state.view === 'month') surf.appendChild(renderMonthView());
   if(state.view === 'week') surf.appendChild(renderWeekView());
   if(state.view === 'list') surf.appendChild(renderListView());
@@ -453,7 +489,6 @@ function renderMonthView(){
   const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
   const end   = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
 
-  // Timed (short) one-offs only for month cells
   const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
 
   let cursor = start;
@@ -469,12 +504,10 @@ function renderMonthView(){
 
     const allEvents = collectEventsForRange(weekStartISO, weekEndISO);
 
-    // Tier split:
-    const tierSuper = allEvents.filter(e => e.kind === 'supermonth');
-    const tierOneOff = allEvents.filter(e => e.kind === 'oneoff'); // multi-day one-offs only (by construction)
-    const tierOther = allEvents.filter(e => e.kind !== 'supermonth' && e.kind !== 'oneoff');
+    const tierSuper  = allEvents.filter(e => e.kind === 'supermonth');
+    const tierOneOff = allEvents.filter(e => e.kind === 'oneoff');
+    const tierOther  = allEvents.filter(e => e.kind !== 'supermonth' && e.kind !== 'oneoff');
 
-    // Hidden counts accumulate across tiers
     const hiddenByDay = new Map();
     const addHidden = (m)=>{
       for(const [k,v] of m.entries()){
@@ -484,6 +517,7 @@ function renderMonthView(){
 
     function renderTier(events, maxLanes){
       if(!events.length) return null;
+
       const tier = document.createElement('div');
       tier.className = 'month-bars';
 
@@ -492,11 +526,11 @@ function renderMonthView(){
 
       for(const p of placed){
         const bar = document.createElement('div');
-      bar.className =
-        (p.kind === 'special') ? 'bar special'
-        : (p.kind === 'standard') ? 'bar standard'
-        : (p.kind === 'oneoff') ? 'bar oneoff'
-        : ('bar' + (p.lane === 1 ? ' secondary' : ''));;
+        bar.className =
+          (p.kind === 'special') ? 'bar special'
+          : (p.kind === 'standard') ? 'bar standard'
+          : (p.kind === 'oneoff') ? 'bar oneoff'
+          : ('bar' + (p.lane === 1 ? ' secondary' : ''));
 
         bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
         bar.style.gridRow = `${p.lane+1}`;
@@ -508,16 +542,14 @@ function renderMonthView(){
       return tier;
     }
 
-    // Render tiers in strict order
-    const t1 = renderTier(tierSuper, 3);  // SuperMonths
-    const t2 = renderTier(tierOneOff, 2); // Multi-day One-Offs
-    const t3 = renderTier(tierOther, 3);  // Special/Standard/etc
+    const t1 = renderTier(tierSuper, 3);
+    const t2 = renderTier(tierOneOff, 2);
+    const t3 = renderTier(tierOther, 3);
 
     if(t1) weekEl.appendChild(t1);
     if(t2) weekEl.appendChild(t2);
     if(t3) weekEl.appendChild(t3);
 
-    // Days grid
     const daysEl = document.createElement('div');
     daysEl.className = 'week-days';
 
@@ -533,39 +565,40 @@ function renderMonthView(){
       if(dateISO === todayISO) day.classList.add('today');
       if(state.highlightDateISO && dateISO === state.highlightDateISO) day.classList.add('highlight');
 
-      // Grey out days outside canonical supermonth range
       if(monthSeo.canonical){
         const inRange = (dateISO >= rangeStartISO && dateISO <= rangeEndISO);
         if(!inRange) day.classList.add('outside');
       }
 
-      // Seoian label (your new overlap format should already be in use here)
-      const seo = canonicalSeoianDate(dateISO);
       const sd = document.createElement('div');
       sd.className = 'sd';
       sd.textContent = seoianLabelWithOverlaps(dateISO);
       if(sd.textContent === '—') sd.textContent = '';
       day.appendChild(sd);
 
-      // Timed one-offs in cell (short only)
       const timed = (oneOffByDay.get(dateISO) || []).filter(ev => !isMultiDayOneOff(ev));
       const MAX_TIMED_VISIBLE = 2;
 
       if(timed.length){
         const items = document.createElement('div');
         items.className = 'day-items';
-        timed.slice(0, MAX_TIMED_VISIBLE).forEach(ev=>{
+
+        timed.slice(0, MAX_TIMED_VISIBLE).forEach(ev => {
           const row = document.createElement('div');
           row.className = 'day-item';
+
           const t = document.createElement('span');
           t.className = 't';
           t.textContent = fmtTimeHHMM(ev.startLocal);
           row.appendChild(t);
+
           const txt = document.createElement('span');
           txt.textContent = ev.title;
           row.appendChild(txt);
+
           items.appendChild(row);
         });
+
         day.appendChild(items);
       }
 
@@ -601,6 +634,7 @@ function renderMonthView(){
 
   return wrap;
 }
+
 function renderWeekView(){
   const wrap = document.createElement('div');
   wrap.className = 'week';
@@ -609,15 +643,16 @@ function renderWeekView(){
 
   const header = document.createElement('div');
   header.className = 'week-dow';
+
   const spacer = document.createElement('div');
   spacer.className = 'week-dow-spacer';
   header.appendChild(spacer);
 
   const showGreg = el('toggleGregorian').checked;
+
   for(let i=0;i<7;i++){
     const d = dt.plus({days:i});
     const dateISO = d.toISODate();
-    const seo = canonicalSeoianDate(dateISO);
 
     const cell = document.createElement('div');
     cell.className = 'week-dow-cell';
@@ -643,12 +678,12 @@ function renderWeekView(){
 
     header.appendChild(cell);
   }
+
   wrap.appendChild(header);
 
   const weekStartISO = dt.toISODate();
   const weekEndISO = dt.plus({days:6}).toISODate();
 
-  // All-day bars: SuperMonths + Special + Standard + MULTI-DAY One-Offs
   const barsEl = document.createElement('div');
   barsEl.className = 'week-bars';
 
@@ -662,14 +697,15 @@ function renderWeekView(){
       (p.kind === 'standard') ? 'bar standard' :
       (p.kind === 'oneoff') ? 'bar oneoff' :
       ('bar' + (p.lane === 1 ? ' secondary' : ''));
+
     bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
     bar.style.gridRow = `${p.lane+1}`;
     bar.textContent = p.label;
     barsEl.appendChild(bar);
   }
+
   wrap.appendChild(barsEl);
 
-  // Hour grid (always 24 rows)
   const bounds = superDayBounds(state.focusDateISO, state.tamaraTZ, state.martinTZ);
   const durMs = bounds.end.toUTC().toMillis() - bounds.start.toUTC().toMillis();
   const nHoursRounded = ceilToHalfHourHours(durMs / 3600000);
@@ -707,7 +743,6 @@ function renderWeekView(){
     }
   }
 
-  // Short One-Off timed blocks only
   renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO);
 
   wrap.appendChild(grid);
@@ -717,7 +752,6 @@ function renderWeekView(){
 function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
   if(!enabledForOneOff()) return;
 
-  // calendar context returns SHORT one-offs only
   const byDay = groupOneOffsByDay(weekStartISO, weekEndISO, 'calendar');
 
   const ROW_H = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--week-row-h')) || 56;
@@ -738,8 +772,10 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
         if(cell){
           const block = document.createElement('div');
           block.className = 'oneoff-block';
-          const top = (minInHour/60) * ROW_H;
-          const height = Math.max(MIN_H, (take/60) * ROW_H);
+
+          const top = (minInHour / 60) * ROW_H;
+          const height = Math.max(MIN_H, (take / 60) * ROW_H);
+
           block.style.top = `${top}px`;
           block.style.height = `${height}px`;
           block.textContent = ev.title;
@@ -764,7 +800,6 @@ function renderListView(){
   const start = focus.startOf('day').minus({days:3});
   const end = focus.startOf('day').plus({days:26});
 
-  // list context includes multi-day + short one-offs
   const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'list');
 
   for(let i=0;i<=end.diff(start,'days').days;i++){
@@ -773,13 +808,7 @@ function renderListView(){
     const seo = canonicalSeoianDate(dateISO);
 
     const active = state.filters.superMonths ? activeSuperMonths(dateISO) : [];
-    const syDefs = syEventDefsForDate(dateISO).filter(x=>x.showOnCalendar);
-    const gyDefs = gregorianDefsForDate(dateISO).filter(x=>x.showOnCalendar);
-
-    const dayDefs = [...syDefs, ...gyDefs].sort((a,b)=>
-      (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title)
-    );
-
+    const dayDefs = recurringDayDefsForDate(dateISO, 'showOnCalendar');
     const oneOffs = oneOffByDay.get(dateISO) || [];
 
     const card = document.createElement('div');
@@ -816,7 +845,6 @@ function renderListView(){
 
     let any = false;
 
-    // SuperMonths first
     for(const a of active.sort((x,y)=>x.monthNo-y.monthNo)){
       any = true;
       const row = document.createElement('div');
@@ -825,7 +853,6 @@ function renderListView(){
       items.appendChild(row);
     }
 
-    // Then Special/Standard all-day events
     for(const def of dayDefs){
       any = true;
       const row = document.createElement('div');
@@ -835,7 +862,6 @@ function renderListView(){
       items.appendChild(row);
     }
 
-    // Then One-Offs (multi-day as title only; short with time)
     if(state.filters.oneOff){
       for(const ev of oneOffs){
         any = true;
@@ -875,17 +901,16 @@ function enabledForCategory(cat){
   if(isStandardCategory(c)) return state.filters.standardDays;
   return true;
 }
+
 function enabledForOneOff(){ return !!state.filters.oneOff; }
 
 function activeSeoianMonthDayPairs(dateISO){
-  // Returns all (monthNo, day) pairs that are valid for this Gregorian dateISO,
-  // across ALL active SuperMonths (overlaps allowed).
   const act = activeSuperMonths(dateISO);
   if(!act || act.length === 0) return [];
 
   const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
-
   const pairs = [];
+
   for(const r of act){
     const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
     const day = dUTC.diff(startUTC, 'days').days + 1;
@@ -901,10 +926,7 @@ function activeSeoianMonthDayPairs(dateISO){
     }
   }
 
-  // Stable ordering: earliest-started month first (older label first),
-  // then by month number
   pairs.sort((a,b)=> a.start.localeCompare(b.start) || (a.monthNo - b.monthNo) || (a.day - b.day));
-
   return pairs;
 }
 
@@ -915,7 +937,6 @@ function syEventDefsForDate(dateISO){
   const pairs = activeSeoianMonthDayPairs(dateISO);
   if(pairs.length === 0) return [];
 
-  // Collect defs across all matching keys, de-dupe by id
   const byId = new Map();
 
   for(const p of pairs){
@@ -923,18 +944,17 @@ function syEventDefsForDate(dateISO){
     const arr = state.data.syByKey.get(key) || [];
 
     for(const def of arr){
-      // category filter + start year rule
       if(!enabledForCategory(def.category)) continue;
       if(syYear < (def.syStartYear || 1)) continue;
 
-      // de-dupe: keep the "best" version if duplicated (usually not needed, but safe)
       const existing = byId.get(def.id);
       if(!existing){
         byId.set(def.id, def);
       }else{
-        // prefer lower rank, then lower sequence
-        const er = existing.rank ?? 9, dr = def.rank ?? 9;
-        const es = existing.sequence ?? 9999, ds = def.sequence ?? 9999;
+        const er = existing.rank ?? 9;
+        const dr = def.rank ?? 9;
+        const es = existing.sequence ?? 9999;
+        const ds = def.sequence ?? 9999;
         if(dr < er || (dr === er && ds < es)){
           byId.set(def.id, def);
         }
@@ -944,7 +964,6 @@ function syEventDefsForDate(dateISO){
 
   const out = Array.from(byId.values());
 
-  // Keep your existing ordering rules
   out.sort((a,b)=>
     (a.rank ?? 9) - (b.rank ?? 9) ||
     (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
@@ -953,6 +972,7 @@ function syEventDefsForDate(dateISO){
 
   return out;
 }
+
 function weekdayToLuxon(w){
   if(w === null || w === undefined) return null;
   const n = Number(w);
@@ -981,6 +1001,7 @@ function easterSundayMonthDay(year){
 
 function occurrenceISOForGregorianRule(def, year){
   if(year < (def.gregStartYear || 0)) return null;
+
   const zone = state.displayTZ;
   const t = def.anchorType;
 
@@ -990,19 +1011,23 @@ function occurrenceISOForGregorianRule(def, year){
   }
 
   if(t === 'GY_NTH_DOW'){
-    if(!def.gyMonth || !def.nth || def.weekday===null || def.weekday===undefined) return null;
+    if(!def.gyMonth || !def.nth || def.weekday === null || def.weekday === undefined) return null;
+
     const target = weekdayToLuxon(def.weekday);
     const first = DateTime.fromObject({year, month:def.gyMonth, day:1}, {zone});
     const firstW = first.weekday;
     const delta = (target - firstW + 7) % 7;
     const day = 1 + delta + (def.nth - 1) * 7;
+
     const dt = DateTime.fromObject({year, month:def.gyMonth, day}, {zone});
     if(dt.month !== def.gyMonth) return null;
+
     return dt.toISODate();
   }
 
   if(t === 'GY_LAST_DOW'){
-    if(!def.gyMonth || def.weekday===null || def.weekday===undefined) return null;
+    if(!def.gyMonth || def.weekday === null || def.weekday === undefined) return null;
+
     const target = weekdayToLuxon(def.weekday);
     let dt = DateTime.fromObject({year, month:def.gyMonth, day:1}, {zone}).endOf('month').startOf('day');
     while(dt.weekday !== target) dt = dt.minus({days:1});
@@ -1010,7 +1035,8 @@ function occurrenceISOForGregorianRule(def, year){
   }
 
   if(t === 'GY_LAST_DOW_BEFORE_DATE'){
-    if(!def.gyMonth || !def.gyDay || def.weekday===null || def.weekday===undefined) return null;
+    if(!def.gyMonth || !def.gyDay || def.weekday === null || def.weekday === undefined) return null;
+
     const target = weekdayToLuxon(def.weekday);
     let dt = DateTime.fromObject({year, month:def.gyMonth, day:def.gyDay}, {zone}).minus({days:1}).startOf('day');
     while(dt.weekday !== target) dt = dt.minus({days:1});
@@ -1020,8 +1046,10 @@ function occurrenceISOForGregorianRule(def, year){
   if(t === 'GY_EASTER'){
     const {month, day} = easterSundayMonthDay(year);
     let dt = DateTime.fromObject({year, month, day}, {zone}).startOf('day');
+
     const off = Number(def.offsetDays || 0);
     if(Number.isFinite(off) && off !== 0) dt = dt.plus({days: off});
+
     return dt.toISODate();
   }
 
@@ -1041,7 +1069,6 @@ function occurrenceRangeForGregorianRule(def, year){
       {zone:'UTC'}
     ).startOf('day');
 
-    // future-proof for spans that wrap across New Year
     if(end < start){
       end = end.plus({years:1});
     }
@@ -1071,6 +1098,7 @@ function activeGregorianOccurrenceForDate(def, dateISO){
 
 function gregorianDefsForDate(dateISO){
   if(!state.data.gyDefs) return [];
+
   const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
   const year = dt.year;
   const out = [];
@@ -1078,7 +1106,6 @@ function gregorianDefsForDate(dateISO){
   for(const def of state.data.gyDefs){
     if(!enabledForCategory(def.category)) continue;
 
-    // check current year, plus previous year for possible year-wrapping spans
     const yearsToCheck = (def.endMonth && def.endDay) ? [year - 1, year] : [year];
 
     for(const y of yearsToCheck){
@@ -1111,13 +1138,9 @@ function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
   const rangeEndMsExclusive = rangeEndExclusive.toMillis();
 
   for(const def of state.data.oneOffDefs){
-    const allow =
-      (context === 'inspector') ? def.showInInspector :
-      def.showOnCalendar;
-
+    const allow = (context === 'inspector') ? def.showInInspector : def.showOnCalendar;
     if(!allow) continue;
 
-    // In Month/Week calendar surfaces, do not return multi-day (they render as bars)
     if(context === 'calendar' && isMultiDayOneOff(def)) continue;
 
     const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
@@ -1131,23 +1154,26 @@ function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
 
     while(dayCursor <= lastDay){
       const dayISO = dayCursor.toISODate();
+
       if(dayISO >= rangeStartISO && dayISO <= rangeEndISO){
         const dayStart = dayCursor;
         const dayEndExclusive = dayCursor.plus({days:1});
+
         if(startLocal < dayEndExclusive && endLocal > dayStart){
           if(!out.has(dayISO)) out.set(dayISO, []);
           out.get(dayISO).push({ ...def, startLocal, endLocal });
         }
       }
+
       dayCursor = dayCursor.plus({days:1});
     }
   }
 
-  for(const [k,arr] of out.entries()){
+  for(const [, arr] of out.entries()){
     arr.sort((a,b)=>
       a.startLocal.toMillis() - b.startLocal.toMillis() ||
-      (a.rank-b.rank) ||
-      (a.sequence-b.sequence) ||
+      (a.rank - b.rank) ||
+      (a.sequence - b.sequence) ||
       a.title.localeCompare(b.title)
     );
   }
@@ -1163,11 +1189,11 @@ function oneOffsForDate(dateISO, context='calendar'){
 function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   const events = [];
 
-  // SuperMonths: Priority 0
   if(state.filters.superMonths){
     const syStart = seoianYearForGregorian(rangeStartISO);
     const syEnd = seoianYearForGregorian(rangeEndISO);
     const years = new Set([syStart, syEnd]);
+
     for(const y of years){
       const arr = state.data.rangesBySeoYear.get(y) || [];
       for(const r of arr){
@@ -1186,10 +1212,9 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
     }
   }
 
-  // SY anchored day defs
   const start = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
   const end = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).startOf('day');
-  const days = Math.round(end.diff(start,'days').days);
+  const days = Math.round(end.diff(start, 'days').days);
 
   for(let i=0;i<=days;i++){
     const dateISO = start.plus({days:i}).toISODate();
@@ -1209,7 +1234,6 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
     }
   }
 
-  // Gregorian rules
   const startY = start.year;
   const endY = end.year;
 
@@ -1235,7 +1259,6 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
     }
   }
 
-  // MULTI-DAY one-offs as spanning bars
   if(state.filters.oneOff && state.data.oneOffDefs){
     for(const def of state.data.oneOffDefs){
       if(!def.showOnCalendar) continue;
@@ -1257,8 +1280,8 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   }
 
   events.sort((a,b)=>
-    (a.rank??9)-(b.rank??9) ||
-    (a.sequence??9999)-(b.sequence??9999) ||
+    (a.rank ?? 9) - (b.rank ?? 9) ||
+    (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
     a.start.localeCompare(b.start) ||
     a.label.localeCompare(b.label)
   );
@@ -1278,7 +1301,7 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
   function dayIndex(dateISO){
     const dt = DateTime.fromISO(dateISO, {zone:state.displayTZ});
     const ws = DateTime.fromISO(weekStartISO, {zone:state.displayTZ});
-    return Math.round(dt.diff(ws,'days').days);
+    return Math.round(dt.diff(ws, 'days').days);
   }
 
   for(const ev of events){
@@ -1289,20 +1312,20 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 
     let lane = -1;
     for(let l=0;l<maxLanes;l++){
-      let ok=true;
+      let ok = true;
       for(let c=cStart;c<=cEnd;c++){
-        if(lanes[l][c]) { ok=false; break; }
+        if(lanes[l][c]) { ok = false; break; }
       }
-      if(ok){ lane=l; break; }
+      if(ok){ lane = l; break; }
     }
 
-    if(lane>=0){
-      for(let c=cStart;c<=cEnd;c++) lanes[lane][c]=true;
+    if(lane >= 0){
+      for(let c=cStart;c<=cEnd;c++) lanes[lane][c] = true;
       placed.push({ ...ev, lane, colStart:cStart+1, colEnd:cEnd+1 });
     }else{
       for(let c=cStart;c<=cEnd;c++){
         const dISO = DateTime.fromISO(weekStartISO, {zone:state.displayTZ}).plus({days:c}).toISODate();
-        hiddenByDay.set(dISO, (hiddenByDay.get(dISO)||0)+1);
+        hiddenByDay.set(dISO, (hiddenByDay.get(dISO) || 0) + 1);
       }
     }
   }
@@ -1318,17 +1341,10 @@ function snapshotDay(dateISO){
     ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
     : [];
 
-  const gyForDate = gregorianDefsForDate(dateISO);
+  const dayDefs = recurringDayDefsForDate(dateISO, 'showInInspector');
 
-  const specialDays = state.filters.specialDays
-    ? [
-        ...syEventDefsForDate(dateISO).filter(d => isSpecialCategory(d.category) && d.showInInspector),
-        ...gyForDate.filter(d => isSpecialCategory(d.category) && d.showInInspector)
-      ]
-    : [];
-
-  const standardDays = state.filters.standardDays
-    ? gyForDate.filter(d => isStandardCategory(d.category) && d.showInInspector)
+  const oneOffs = (state.filters.oneOff && state.data.oneOffDefs)
+    ? oneOffsForDate(dateISO, 'inspector')
     : [];
 
   const silentSong = silentSoundForDate(dateISO);
@@ -1337,8 +1353,7 @@ function snapshotDay(dateISO){
     dateISO,
     seoianLabel: seo.label,
     gregorianLabel: fmtGreg(dateISO),
-    specialDays,
-    standardDays,
+    dayDefs,
     oneOffs,
     silentSong,
     periods,
@@ -1370,13 +1385,11 @@ function renderInspector(){
   const p = el('inspectorPeriods');
   p.innerHTML = '';
 
-  const specials = (snap.specialDays || []);
-  const standards = (snap.standardDays || []);
-  const oneOffs = (snap.oneOffs || []);
+  const dayDefs = snap.dayDefs || [];
+  const oneOffs = snap.oneOffs || [];
 
   let any = false;
 
-  // SuperMonths first
   if(snap.periods && snap.periods.length){
     any = true;
     for(const item of snap.periods){
@@ -1387,19 +1400,18 @@ function renderInspector(){
     }
   }
 
-  // Special
-  if(specials.length){
+  if(dayDefs.length){
     any = true;
-    for(const s of specials){
+    for(const d of dayDefs){
       const div = document.createElement('div');
       div.className = 'eventitem';
 
       const t = document.createElement('div');
       t.className = 'title';
-      t.textContent = s.title;
+      t.textContent = d.title;
       div.appendChild(t);
 
-      const inspectorNote = gregorianInspectorNote(s, snap.dateISO);
+      const inspectorNote = inspectorNoteForDayDef(d, snap.dateISO);
       if(inspectorNote){
         const n = document.createElement('div');
         n.className = 'note';
@@ -1411,31 +1423,6 @@ function renderInspector(){
     }
   }
 
-  // Standard
-  if(standards.length){
-    any = true;
-    for(const s of standards){
-      const div = document.createElement('div');
-      div.className = 'eventitem';
-
-      const t = document.createElement('div');
-      t.className = 'title';
-      t.textContent = s.title;
-      div.appendChild(t);
-
-      const inspectorNote = gregorianInspectorNote(s, snap.dateISO);
-      if(inspectorNote){
-        const n = document.createElement('div');
-        n.className = 'note';
-        n.textContent = inspectorNote;
-        div.appendChild(n);
-      }
-
-      p.appendChild(div);
-    }
-  }
-
-  // One-Offs last (every affected day)
   if(oneOffs.length){
     any = true;
     for(const ev of oneOffs){
@@ -1444,11 +1431,9 @@ function renderInspector(){
 
       const t = document.createElement('div');
       t.className = 'title';
-      // multi-day one-offs: title only; short: include local time
       t.textContent = isMultiDayOneOff(ev) ? ev.title : `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`;
       div.appendChild(t);
 
-      // Origin line (start)
       const originTZ = ev.originTZ || 'UTC';
       const originDT = DateTime.fromMillis(ev.startUtcMs, {zone:'utc'}).setZone(originTZ);
       const o = document.createElement('div');
@@ -1467,34 +1452,35 @@ function renderInspector(){
     }
   }
 
-  // Silent Sounds: Song of the Day
-if(snap.silentSong){
-  any = true;
-  const div = document.createElement('div');
-  div.className = 'eventitem songofday';
+  if(snap.silentSong){
+    any = true;
 
-  const t = document.createElement('div');
-  t.className = 'title';
-  t.textContent = 'Silent Sounds (Song of the Day)';
-  div.appendChild(t);
+    const div = document.createElement('div');
+    div.className = 'eventitem songofday';
 
-  const a = document.createElement('a');
-  a.href = snap.silentSong.url;
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  a.className = 'songlink';
-  a.textContent = snap.silentSong.artists
-    ? `${snap.silentSong.title} — ${snap.silentSong.artists}`
-    : snap.silentSong.title;
-  div.appendChild(a);
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = 'Silent Sounds (Song of the Day)';
+    div.appendChild(t);
 
-  p.appendChild(div);
-}
+    const a = document.createElement('a');
+    a.href = snap.silentSong.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'songlink';
+    a.textContent = snap.silentSong.artists
+      ? `${snap.silentSong.title} — ${snap.silentSong.artists}`
+      : snap.silentSong.title;
+    div.appendChild(a);
+
+    p.appendChild(div);
+  }
 
   if(!any) p.innerHTML = '<div class="muted">(no periods)</div>';
 
   const f = el('inspectorFacts');
   f.innerHTML = '';
+
   const rows = [
     ['Eastern TZ', snap.facts.east],
     ['Western TZ', snap.facts.west],
@@ -1503,14 +1489,19 @@ if(snap.silentSong){
     ['Length', snap.facts.length],
     ['Snapshot TZs', `${snap.tzAtSnapshot.tamaraTZ} / ${snap.tzAtSnapshot.martinTZ}`]
   ];
+
   for(const [k,v] of rows){
     const r = document.createElement('div');
     r.className = 'factrow';
+
     const a = document.createElement('span');
     a.textContent = k;
+
     const b = document.createElement('span');
     b.textContent = v;
-    r.appendChild(a); r.appendChild(b);
+
+    r.appendChild(a);
+    r.appendChild(b);
     f.appendChild(r);
   }
 }
@@ -1545,21 +1536,46 @@ function activePeriodsForISO(dateISO){
   }
   return out;
 }
+
+function recurringDayDefsForDate(dateISO, visibilityField='showOnCalendar'){
+  const defs = [
+    ...syEventDefsForDate(dateISO),
+    ...gregorianDefsForDate(dateISO),
+  ].filter(d => {
+    if(!d) return false;
+    if(visibilityField === 'showInInspector') return !!d.showInInspector;
+    return !!d.showOnCalendar;
+  });
+
+  const seen = new Set();
+  const out = [];
+
+  for(const d of defs){
+    const key = d.id || `${d.anchorType}|${d.title}`;
+    if(seen.has(key)) continue;
+    seen.add(key);
+    out.push(d);
+  }
+
+  out.sort((a,b)=>
+    (a.rank ?? 9) - (b.rank ?? 9) ||
+    (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
+    a.title.localeCompare(b.title)
+  );
+
+  return out;
+}
+
 function allDayDefsForDate(dateISO){
-  const sy = syEventDefsForDate(dateISO).filter(d=>d.showOnCalendar);
-  const gy = gregorianDefsForDate(dateISO).filter(d=>d.showOnCalendar);
-  const defs = [...sy, ...gy].filter(d=>enabledForCategory(d.category));
-  defs.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
-  return defs;
+  return recurringDayDefsForDate(dateISO, 'showOnCalendar');
 }
 
 function daysInclusive(startISO, endISO){
   const start = DateTime.fromISO(startISO, {zone:'UTC'}).startOf('day');
   const end = DateTime.fromISO(endISO, {zone:'UTC'}).startOf('day');
-  return Math.floor(end.diff(start, 'days').days + 1);
+  return Math.floor(end.diff(start, 'days').days) + 1;
 }
 
-// TM Time Helpers
 function normalizeKey(s){
   return String(s || '')
     .trim()
@@ -1572,12 +1588,12 @@ function isTMTime(def){
   const titleKey = normalizeKey(def.title);
 
   return (
-    idKey === 'TMTIME' ||
+    idKey.endsWith('TMTIME') ||
     titleKey === 'TMTIME'
   );
 }
 
-function gregorianInspectorNote(def, dateISO){
+function inspectorNoteForDayDef(def, dateISO){
   if(!isTMTime(def)) return def.notes || '';
 
   const occ = activeGregorianOccurrenceForDate(def, dateISO);
@@ -1588,7 +1604,7 @@ function gregorianInspectorNote(def, dateISO){
   const dayNo = Math.floor(current.diff(start, 'days').days) + 1;
   const totalDays = daysInclusive(occ.startISO, occ.endISO);
 
-  return `The Original Period Together - Day ${dayNo} of ${totalDays}`;
+  return `TM Time - The Original Period Together - Day ${dayNo} of ${totalDays}`;
 }
 
 // ---------- +more popover ----------
@@ -1596,6 +1612,7 @@ function closeMorePopover(){
   const pop = el('morePopover');
   if(!pop) return;
   pop.hidden = true;
+
   const body = el('morePopoverBody');
   if(body) body.innerHTML = '';
 }
@@ -1607,24 +1624,20 @@ function openMorePopover(dateISO, anchorEl){
 
   body.innerHTML = '';
 
-  // Build the list (strict priority): SuperMonths → Special → Standard → One-Off (timed only)
   const periods = activePeriodsForISO(dateISO);
   const defs = allDayDefsForDate(dateISO);
   const items = [];
 
-  // SuperMonths (Priority 0)
   periods.forEach(p => items.push({ label: p.name, kind: 'period' }));
 
-  // All-day events (Special → Standard → Other)
-  const specials = defs.filter(d=> isSpecialCategory(d.category));
-  const standards = defs.filter(d=> isStandardCategory(d.category));
-  const others = defs.filter(d=> !isSpecialCategory(d.category) && !isStandardCategory(d.category));
+  const specials = defs.filter(d => isSpecialCategory(d.category));
+  const standards = defs.filter(d => isStandardCategory(d.category));
+  const others = defs.filter(d => !isSpecialCategory(d.category) && !isStandardCategory(d.category));
 
   specials.forEach(d => items.push({ label: d.title, kind: 'special' }));
   standards.forEach(d => items.push({ label: d.title, kind: 'standard' }));
   others.forEach(d => items.push({ label: d.title, kind: 'other' }));
 
-  // One-Off timed events ONLY (exclude multi-day/all-day one-offs which are already bars)
   const oneOffs = oneOffsForDate(dateISO, 'calendar').filter(ev => !isMultiDayOneOff(ev));
   oneOffs.forEach(ev => {
     items.push({ label: `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`, kind: 'oneoff' });
@@ -1645,20 +1658,21 @@ function openMorePopover(dateISO, anchorEl){
     });
   }
 
-  // Position near anchor
   const r = anchorEl?.getBoundingClientRect?.();
   const margin = 10;
   const width = 320;
   const height = 260;
+
   let left = margin;
   let top = margin;
+
   if(r){
     left = Math.min(window.innerWidth - width - margin, Math.max(margin, r.left));
     top = Math.min(window.innerHeight - height - margin, Math.max(margin, r.bottom + 6));
   }
+
   pop.style.left = `${left}px`;
   pop.style.top = `${top}px`;
-
   pop.hidden = false;
 
   const closeBtn = el('moreClose');
@@ -1666,7 +1680,6 @@ function openMorePopover(dateISO, anchorEl){
     closeBtn.onclick = () => closeMorePopover();
   }
 
-  // Click outside to close
   setTimeout(() => {
     const onDoc = (ev) => {
       if(pop.hidden) return;
@@ -1688,37 +1701,41 @@ window.addEventListener('click', (e)=>{
 
 // ---------- Clocks ----------
 function makeClockSVG(kind='normal'){
-  const ns='http://www.w3.org/2000/svg';
-  const svg=document.createElementNS(ns,'svg');
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns,'svg');
   svg.setAttribute('viewBox','0 0 200 200');
   svg.setAttribute('width','92%');
   svg.setAttribute('height','92%');
 
-  const face=document.createElementNS(ns,'circle');
-  face.setAttribute('cx','100'); face.setAttribute('cy','100'); face.setAttribute('r','92');
+  const face = document.createElementNS(ns,'circle');
+  face.setAttribute('cx','100');
+  face.setAttribute('cy','100');
+  face.setAttribute('r','92');
   face.setAttribute('fill','#fff');
   face.setAttribute('stroke','#e6e7ea');
   face.setAttribute('stroke-width','2');
   svg.appendChild(face);
 
   for(let i=0;i<60;i++){
-    const tick=document.createElementNS(ns,'line');
-    const a=(Math.PI*2*i)/60;
-    const r1 = (i%5===0)?78:84;
+    const tick = document.createElementNS(ns,'line');
+    const a = (Math.PI * 2 * i) / 60;
+    const r1 = (i % 5 === 0) ? 78 : 84;
     const r2 = 90;
-    const x1=100+Math.sin(a)*r1;
-    const y1=100-Math.cos(a)*r1;
-    const x2=100+Math.sin(a)*r2;
-    const y2=100-Math.cos(a)*r2;
-    tick.setAttribute('x1',x1); tick.setAttribute('y1',y1);
-    tick.setAttribute('x2',x2); tick.setAttribute('y2',y2);
-    tick.setAttribute('stroke', (i%5===0)?'#cfd3da':'#e6e7ea');
-    tick.setAttribute('stroke-width', (i%5===0)?2:1);
+    const x1 = 100 + Math.sin(a) * r1;
+    const y1 = 100 - Math.cos(a) * r1;
+    const x2 = 100 + Math.sin(a) * r2;
+    const y2 = 100 - Math.cos(a) * r2;
+    tick.setAttribute('x1', x1);
+    tick.setAttribute('y1', y1);
+    tick.setAttribute('x2', x2);
+    tick.setAttribute('y2', y2);
+    tick.setAttribute('stroke', (i % 5 === 0) ? '#cfd3da' : '#e6e7ea');
+    tick.setAttribute('stroke-width', (i % 5 === 0) ? 2 : 1);
     svg.appendChild(tick);
   }
 
   function addText(id, txt, x, y){
-    const t=document.createElementNS(ns,'text');
+    const t = document.createElementNS(ns,'text');
     t.setAttribute('x', x);
     t.setAttribute('y', y);
     t.setAttribute('text-anchor','middle');
@@ -1743,56 +1760,64 @@ function makeClockSVG(kind='normal'){
     addText('n9','',34,102);
   }
 
-  const hour=document.createElementNS(ns,'line');
-  hour.setAttribute('x1','100'); hour.setAttribute('y1','100');
-  hour.setAttribute('x2','100'); hour.setAttribute('y2','54');
+  const hour = document.createElementNS(ns,'line');
+  hour.setAttribute('x1','100');
+  hour.setAttribute('y1','100');
+  hour.setAttribute('x2','100');
+  hour.setAttribute('y2','54');
   hour.setAttribute('stroke','#111318');
   hour.setAttribute('stroke-width','5');
   hour.setAttribute('stroke-linecap','round');
-  hour.id='h';
+  hour.id = 'h';
   svg.appendChild(hour);
 
-  const minute=document.createElementNS(ns,'line');
-  minute.setAttribute('x1','100'); minute.setAttribute('y1','100');
-  minute.setAttribute('x2','100'); minute.setAttribute('y2','34');
+  const minute = document.createElementNS(ns,'line');
+  minute.setAttribute('x1','100');
+  minute.setAttribute('y1','100');
+  minute.setAttribute('x2','100');
+  minute.setAttribute('y2','34');
   minute.setAttribute('stroke','#111318');
   minute.setAttribute('stroke-width','3');
   minute.setAttribute('stroke-linecap','round');
-  minute.id='m';
+  minute.id = 'm';
   svg.appendChild(minute);
 
-  const second=document.createElementNS(ns,'line');
-  second.setAttribute('x1','100'); second.setAttribute('y1','108');
-  second.setAttribute('x2','100'); second.setAttribute('y2','24');
+  const second = document.createElementNS(ns,'line');
+  second.setAttribute('x1','100');
+  second.setAttribute('y1','108');
+  second.setAttribute('x2','100');
+  second.setAttribute('y2','24');
   second.setAttribute('stroke','#1b6b6f');
   second.setAttribute('stroke-width','2');
   second.setAttribute('stroke-linecap','round');
-  second.id='s';
+  second.id = 's';
   svg.appendChild(second);
 
-  const dot=document.createElementNS(ns,'circle');
-  dot.setAttribute('cx','100'); dot.setAttribute('cy','100'); dot.setAttribute('r','5');
+  const dot = document.createElementNS(ns,'circle');
+  dot.setAttribute('cx','100');
+  dot.setAttribute('cy','100');
+  dot.setAttribute('r','5');
   dot.setAttribute('fill','#1b6b6f');
   svg.appendChild(dot);
 
   return svg;
 }
 
-function rotate(el, deg){
-  el.setAttribute('transform', `rotate(${deg} 100 100)`);
+function rotate(elm, deg){
+  elm.setAttribute('transform', `rotate(${deg} 100 100)`);
 }
 
 function mountClocks(){
   const hostT = el('clockTamara');
-  hostT.innerHTML='';
+  hostT.innerHTML = '';
   hostT.appendChild(makeClockSVG('normal'));
 
   const hostM = el('clockMartin');
-  hostM.innerHTML='';
+  hostM.innerHTML = '';
   hostM.appendChild(makeClockSVG('normal'));
 
   const hostS = el('clockSuperday');
-  hostS.innerHTML='';
+  hostS.innerHTML = '';
   hostS.appendChild(makeClockSVG('superday'));
 }
 
@@ -1838,15 +1863,15 @@ function tickClocks(){
     if(t9) t9.textContent = String(q3);
   }
 
-  const frac = (durMs===0)?0:(elapsedMs/durMs);
+  const frac = (durMs === 0) ? 0 : (elapsedMs / durMs);
   const hourAngle = frac * 360;
 
-  const totalSec = Math.floor(elapsedMs/1000);
+  const totalSec = Math.floor(elapsedMs / 1000);
   const sec = totalSec % 60;
-  const totalMin = Math.floor(totalSec/60);
+  const totalMin = Math.floor(totalSec / 60);
   const min = totalMin % 60;
 
-  const minAngle = (min + sec/60) * 6;
+  const minAngle = (min + sec / 60) * 6;
   const secAngle = sec * 6;
 
   const svg = el('clockSuperday').querySelector('svg');
@@ -1860,16 +1885,17 @@ function tickClocks(){
 function updateAnalog(hostId, dt){
   const svg = el(hostId).querySelector('svg');
   if(!svg) return;
-  const h=svg.querySelector('#h');
-  const m=svg.querySelector('#m');
-  const s=svg.querySelector('#s');
+
+  const h = svg.querySelector('#h');
+  const m = svg.querySelector('#m');
+  const s = svg.querySelector('#s');
 
   const hour = dt.hour % 12;
   const minute = dt.minute;
   const second = dt.second;
 
-  rotate(h, (hour + minute/60) * 30);
-  rotate(m, (minute + second/60) * 6);
+  rotate(h, (hour + minute / 60) * 30);
+  rotate(m, (minute + second / 60) * 6);
   rotate(s, second * 6);
 }
 
@@ -1877,11 +1903,14 @@ function ensureEastWestOrder(){
   const now = DateTime.now();
   const a = now.setZone(state.tamaraTZ);
   const b = now.setZone(state.martinTZ);
+
   if(a.offset === b.offset) return;
+
   if(a.offset < b.offset){
     const tmp = state.tamaraTZ;
     state.tamaraTZ = state.martinTZ;
     state.martinTZ = tmp;
+
     const iA = el('tzTamara');
     const iB = el('tzMartin');
     if(iA && iB){
@@ -1918,6 +1947,7 @@ function bindControls(){
         if(r){ state.focusDateISO = r.start; render(); return; }
       }
     }
+
     const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
     const next = (state.view === 'week') ? dt.minus({weeks:1}) : dt.minus({days:30});
     state.focusDateISO = next.toISODate();
@@ -1935,6 +1965,7 @@ function bindControls(){
         if(r){ state.focusDateISO = r.start; render(); return; }
       }
     }
+
     const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
     const next = (state.view === 'week') ? dt.plus({weeks:1}) : dt.plus({days:30});
     state.focusDateISO = next.toISODate();
@@ -1952,6 +1983,7 @@ function bindControls(){
     const dd = el('filtersDropdown');
     dd.hidden = !dd.hidden;
   });
+
   document.addEventListener('click', (e)=>{
     const dd = el('filtersDropdown');
     const btn = el('btnFilters');
@@ -1973,13 +2005,18 @@ function bindControls(){
   el('jumpInput').addEventListener('input', (e)=>{
     const mode = el('jumpMode').value;
     if(mode !== 'seoian' && mode !== 'gregorian') return;
+
     const raw = e.target.value.replace(/[^0-9]/g,'').slice(0,8);
     let out = '';
-    if(raw.length>=2) out += raw.slice(0,2) + '/';
+
+    if(raw.length >= 2) out += raw.slice(0,2) + '/';
     else out += raw;
-    if(raw.length>=4) out += raw.slice(2,4) + '/';
-    else if(raw.length>2) out += raw.slice(2);
-    if(raw.length>4) out += raw.slice(4);
+
+    if(raw.length >= 4) out += raw.slice(2,4) + '/';
+    else if(raw.length > 2) out += raw.slice(2);
+
+    if(raw.length > 4) out += raw.slice(4);
+
     e.target.value = out;
   });
 
@@ -2002,28 +2039,41 @@ function bindControls(){
 
     const m = val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if(!m) return alert('Invalid Seoian date (DD/MM/YYYY).');
-    const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
+
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = Number(m[3]);
+
     const iso = gregorianFromSeoian(dd, mm, yyyy);
     if(!iso) return alert('Seoian date out of range for that SuperMonth.');
+
     state.focusDateISO = iso;
     render();
   });
 
-  el('tzTamara').addEventListener('change', (e)=>{ state.tamaraTZ = e.target.value || DEFAULTS.tamaraTZ; ensureEastWestOrder(); });
-  el('tzMartin').addEventListener('change', (e)=>{ state.martinTZ = e.target.value || DEFAULTS.martinTZ; ensureEastWestOrder(); });
+  el('tzTamara').addEventListener('change', (e)=>{
+    state.tamaraTZ = e.target.value || DEFAULTS.tamaraTZ;
+    ensureEastWestOrder();
+  });
+
+  el('tzMartin').addEventListener('change', (e)=>{
+    state.martinTZ = e.target.value || DEFAULTS.martinTZ;
+    ensureEastWestOrder();
+  });
 
   const sheet = el('bottomSheet');
   el('sheetHandle').addEventListener('click', ()=>{
     sheet.classList.toggle('expanded');
     el('sheetHandle').querySelector('.sheet-handle-icon').textContent = sheet.classList.contains('expanded') ? '▾' : '▴';
   });
+
   sheet.querySelectorAll('.tab').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       sheet.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       const tab = btn.dataset.tab;
       sheet.querySelectorAll('.sheet-pane').forEach(p=>p.classList.remove('active'));
-      el(tab==='inspector' ? 'sheetInspector' : 'sheetClocks').classList.add('active');
+      el(tab === 'inspector' ? 'sheetInspector' : 'sheetClocks').classList.add('active');
     });
   });
 }
@@ -2051,25 +2101,25 @@ async function loadData(){
 
   const raw = parseCSV(await daysRes.text());
 
-  // Silent Sounds playlist (394)
-const silentText = await silentRes.text();
-const silentRaw = parseCSV(silentText);
+  const silentText = await silentRes.text();
+  const silentRaw = parseCSV(silentText);
 
-const silentSounds = [];
-for(const r of silentRaw){
-  const url = (r['Spotify URL'] || r.Spotify_URL || r.spotify_url || '').trim();
-  const title = (r['Song Title'] || r.Song_Title || r.title || '').trim();
-  const artists = (r['Artists'] || r.Artist || r.artists || '').trim();
+  const silentSounds = [];
+  for(const r of silentRaw){
+    const url = (r['Spotify URL'] || r.Spotify_URL || r.spotify_url || '').trim();
+    const title = (r['Song Title'] || r.Song_Title || r.title || '').trim();
+    const artists = (r['Artists'] || r.Artist || r.artists || '').trim();
 
-  if(!url) continue;
-  silentSounds.push({
-    url,
-    title: title || 'Spotify Track',
-    artists: artists || ''
-  });
-}
+    if(!url) continue;
 
-state.data.silentSounds = silentSounds;
+    silentSounds.push({
+      url,
+      title: title || 'Spotify Track',
+      artists: artists || ''
+    });
+  }
+
+  state.data.silentSounds = silentSounds;
 
   let oneOffRaw = [];
   if(oneOffRes && oneOffRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await oneOffRes.text()));
@@ -2079,14 +2129,13 @@ state.data.silentSounds = silentSounds;
   const gyDefs = [];
   const oneOffDefs = [];
 
-  // AFdS Days (Special + Standard)
   for(const r of raw){
     const id = r.ID || r.id || '';
     const title = r.Title || r.title || '';
     if(!id || !title) continue;
 
     const anchorType = (r.Anchor_Type || r.anchor_type || 'SY').toUpperCase();
-    const category = (r.Category || r.category || '').trim() || (anchorType==='SY' ? 'Special' : 'Standard');
+    const category = (r.Category || r.category || '').trim() || (anchorType === 'SY' ? 'Special' : 'Standard');
 
     const originGregorianStr = r.Origin_Gregorian_Date || r.origin_gregorian_date || '';
     const endGregorianStr = r.End_Gregorian_Date || r.end_gregorian_date || '';
@@ -2136,7 +2185,6 @@ state.data.silentSounds = silentSounds;
     }
   }
 
-  // One-Offs (Star systems + MiAViG)
   for(const r of oneOffRaw){
     const id = r.ID || r.id || r['\ufeffID'] || '';
     const title = r.Title || r.title || '';
@@ -2162,7 +2210,7 @@ state.data.silentSounds = silentSounds;
     if(dtEnd && dtEnd.isValid){
       endUtcMs = dtEnd.toUTC().toMillis();
       if(endUtcMs <= startUtcMs) continue;
-    } else {
+    }else{
       endUtcMs = dtOrigin.plus({minutes: durMin}).toUTC().toMillis();
     }
 
@@ -2185,16 +2233,17 @@ state.data.silentSounds = silentSounds;
 
       startUtcMs,
       endUtcMs,
-      durationMinutes: Math.round((endUtcMs - startUtcMs)/60000),
+      durationMinutes: Math.round((endUtcMs - startUtcMs) / 60000),
       originTZ,
       endTZ
     });
   }
 
-  for(const [k,arr] of syByKey.entries()){
-    arr.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+  for(const [, arr] of syByKey.entries()){
+    arr.sort((a,b)=> (a.rank - b.rank) || (a.sequence - b.sequence) || a.title.localeCompare(b.title));
   }
-  gyDefs.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
+
+  gyDefs.sort((a,b)=> (a.rank - b.rank) || (a.sequence - b.sequence) || a.title.localeCompare(b.title));
 
   state.data.syByKey = syByKey;
   state.data.gyDefs = gyDefs;
