@@ -113,6 +113,12 @@ function toInt(v, def=null){
   return Number.isFinite(n) ? n : def;
 }
 
+function parseMonthDayFlexible(s){
+  const dt = parseDateTimeFlexible(s, 'UTC');
+  if(!dt || !dt.isValid) return { month:null, day:null };
+  return { month: dt.month, day: dt.day };
+}
+
 function parseDateTimeFlexible(s, zone){
   const str = String(s ?? '').trim();
   if(!str) return null;
@@ -1022,16 +1028,53 @@ function occurrenceISOForGregorianRule(def, year){
   return null;
 }
 
+function occurrenceRangeForGregorianRule(def, year){
+  const startISO = occurrenceISOForGregorianRule(def, year);
+  if(!startISO) return null;
+
+  let endISO = startISO;
+
+  if(def.endMonth && def.endDay){
+    const start = DateTime.fromISO(startISO, {zone:'UTC'}).startOf('day');
+    let end = DateTime.fromObject(
+      {year, month:def.endMonth, day:def.endDay},
+      {zone:'UTC'}
+    ).startOf('day');
+
+    // future-proof for spans that wrap across New Year
+    if(end < start){
+      end = end.plus({years:1});
+    }
+
+    endISO = end.toISODate();
+  }
+
+  return { startISO, endISO };
+}
+
 function gregorianDefsForDate(dateISO){
   if(!state.data.gyDefs) return [];
   const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
   const year = dt.year;
   const out = [];
+
   for(const def of state.data.gyDefs){
     if(!enabledForCategory(def.category)) continue;
-    const occ = occurrenceISOForGregorianRule(def, year);
-    if(occ === dateISO) out.push(def);
+
+    // check current year, plus previous year for possible year-wrapping spans
+    const yearsToCheck = (def.endMonth && def.endDay) ? [year - 1, year] : [year];
+
+    for(const y of yearsToCheck){
+      const occ = occurrenceRangeForGregorianRule(def, y);
+      if(!occ) continue;
+
+      if(occ.startISO <= dateISO && dateISO <= occ.endISO){
+        out.push(def);
+        break;
+      }
+    }
   }
+
   return out;
 }
 
@@ -1152,18 +1195,22 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   // Gregorian rules
   const startY = start.year;
   const endY = end.year;
-  for(let y=startY; y<=endY; y++){
+
+  for(let y = startY - 1; y <= endY; y++){
     for(const def of (state.data.gyDefs || [])){
       if(!def.showOnCalendar) continue;
       if(!enabledForCategory(def.category)) continue;
-      const occ = occurrenceISOForGregorianRule(def, y);
+
+      const occ = occurrenceRangeForGregorianRule(def, y);
       if(!occ) continue;
-      if(occ < rangeStartISO || occ > rangeEndISO) continue;
+
+      if(occ.endISO < rangeStartISO || occ.startISO > rangeEndISO) continue;
+
       events.push({
         id: `${def.id}_${String(y).padStart(4,'0')}`,
         label: def.title,
-        start: occ,
-        end: occ,
+        start: occ.startISO,
+        end: occ.endISO,
         kind: isStandardCategory(def.category) ? 'standard' : isSpecialCategory(def.category) ? 'special' : 'other',
         rank: def.rank ?? 9,
         sequence: def.sequence ?? 9999
@@ -1977,6 +2024,12 @@ state.data.silentSounds = silentSounds;
     const anchorType = (r.Anchor_Type || r.anchor_type || 'SY').toUpperCase();
     const category = (r.Category || r.category || '').trim() || (anchorType==='SY' ? 'Special' : 'Standard');
 
+    const originGregorianStr = r.Origin_Gregorian_Date || r.origin_gregorian_date || '';
+    const endGregorianStr = r.End_Gregorian_Date || r.end_gregorian_date || '';
+
+    const originMD = parseMonthDayFlexible(originGregorianStr);
+    const endMD = parseMonthDayFlexible(endGregorianStr);
+
     const def = {
       id,
       title,
@@ -1999,11 +2052,14 @@ state.data.silentSounds = silentSounds;
         r.Gregorian_Start_Year ?? r.Gregorian_First_Year ?? r.Gergorian_First_Year ?? r.gregorian_start_year ?? r.gregorian_first_year,
         1994
       ),
-      gyMonth: toInt(r.GY_Month ?? r.gy_month, null),
-      gyDay: toInt(r.GY_Day ?? r.gy_day, null),
+      gyMonth: toInt(r.GY_Month ?? r.gy_month, originMD.month),
+      gyDay: toInt(r.GY_Day ?? r.gy_day, originMD.day),
       nth: toInt(r.Nth ?? r.nth, null),
       weekday: toInt(r.Weekday ?? r.weekday, null),
       offsetDays: toInt(r.Offset_Days ?? r.offset_days, 0),
+
+      endMonth: endMD.month,
+      endDay: endMD.day,
     };
 
     if(anchorType === 'SY'){
