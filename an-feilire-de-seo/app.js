@@ -1318,12 +1318,17 @@ function snapshotDay(dateISO){
     ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
     : [];
 
+  const gyForDate = gregorianDefsForDate(dateISO);
+
   const specialDays = state.filters.specialDays
-    ? syEventDefsForDate(dateISO).filter(d=>isSpecialCategory(d.category) && d.showInInspector)
+    ? [
+        ...syEventDefsForDate(dateISO).filter(d => isSpecialCategory(d.category) && d.showInInspector),
+        ...gyForDate.filter(d => isSpecialCategory(d.category) && d.showInInspector)
+      ]
     : [];
 
   const standardDays = state.filters.standardDays
-    ? gregorianDefsForDate(dateISO).filter(d=>isStandardCategory(d.category) && d.showInInspector)
+    ? gyForDate.filter(d => isStandardCategory(d.category) && d.showInInspector)
     : [];
 
   const oneOffs = (state.filters.oneOff && state.data.oneOffDefs)
