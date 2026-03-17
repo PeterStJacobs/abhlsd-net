@@ -1052,6 +1052,23 @@ function occurrenceRangeForGregorianRule(def, year){
   return { startISO, endISO };
 }
 
+function activeGregorianOccurrenceForDate(def, dateISO){
+  const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
+  const year = dt.year;
+
+  const yearsToCheck = (def.endMonth && def.endDay) ? [year - 1, year] : [year];
+
+  for(const y of yearsToCheck){
+    const occ = occurrenceRangeForGregorianRule(def, y);
+    if(!occ) continue;
+    if(occ.startISO <= dateISO && dateISO <= occ.endISO){
+      return occ;
+    }
+  }
+
+  return null;
+}
+
 function gregorianDefsForDate(dateISO){
   if(!state.data.gyDefs) return [];
   const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
@@ -1395,16 +1412,20 @@ function renderInspector(){
     for(const s of standards){
       const div = document.createElement('div');
       div.className = 'eventitem';
+
       const t = document.createElement('div');
       t.className = 'title';
       t.textContent = s.title;
       div.appendChild(t);
-      if(s.notes){
+
+      const inspectorNote = standardInspectorNote(s, snap.dateISO);
+      if(inspectorNote){
         const n = document.createElement('div');
         n.className = 'note';
-        n.textContent = s.notes;
+        n.textContent = inspectorNote;
         div.appendChild(n);
       }
+
       p.appendChild(div);
     }
   }
@@ -1525,6 +1546,26 @@ function allDayDefsForDate(dateISO){
   const defs = [...sy, ...gy].filter(d=>enabledForCategory(d.category));
   defs.sort((a,b)=> (a.rank-b.rank) || (a.sequence-b.sequence) || a.title.localeCompare(b.title));
   return defs;
+}
+
+function daysInclusive(startISO, endISO){
+  const start = DateTime.fromISO(startISO, {zone:'UTC'}).startOf('day');
+  const end = DateTime.fromISO(endISO, {zone:'UTC'}).startOf('day');
+  return Math.floor(end.diff(start, 'days').days + 1);
+}
+
+function standardInspectorNote(def, dateISO){
+  if(def.id !== 'TM_TIME') return def.notes || '';
+
+  const occ = activeGregorianOccurrenceForDate(def, dateISO);
+  if(!occ) return def.notes || '';
+
+  const start = DateTime.fromISO(occ.startISO, {zone:'UTC'}).startOf('day');
+  const current = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+  const dayNo = Math.floor(current.diff(start, 'days').days) + 1;
+  const totalDays = daysInclusive(occ.startISO, occ.endISO);
+
+  return `TM Time - The Original Period Together - Day ${dayNo} of ${totalDays}`;
 }
 
 // ---------- +more popover ----------
