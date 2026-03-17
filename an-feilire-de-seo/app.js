@@ -1604,7 +1604,7 @@ function inspectorNoteForDayDef(def, dateISO){
   const dayNo = Math.floor(current.diff(start, 'days').days) + 1;
   const totalDays = daysInclusive(occ.startISO, occ.endISO);
 
-  return `TM Time - The Original Period Together - Day ${dayNo} of ${totalDays}`;
+  return `The Original Period Together - Day ${dayNo} of ${totalDays}`;
 }
 
 // ---------- +more popover ----------
