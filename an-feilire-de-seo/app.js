@@ -42,6 +42,7 @@ const state = {
     gyDefs: null,
     oneOffDefs: null,
     silentSounds: null,
+    setDaySongs: null,
   }
 };
 
@@ -356,6 +357,38 @@ function oneOffSpanISO(def){
 }
 
 // ---------- Silent Sounds (Song of the Day) ----------
+function normalizeDaySongEntry(entry, source){
+  return {
+    title: String(entry?.title || '').trim() || 'Silent Sounds Track',
+    artists: String(entry?.artist || '').trim(),
+    url: String(entry?.url || '').trim(),
+    note: String(entry?.note || '').trim(),
+    source
+  };
+}
+
+function buildSetDaySongsIndex(raw){
+  const exactByDate = new Map();
+  const recurringByMonthDay = new Map();
+
+  const exactDates = Array.isArray(raw?.exactDates) ? raw.exactDates : [];
+  const gregorianRecurring = Array.isArray(raw?.gregorianRecurring) ? raw.gregorianRecurring : [];
+
+  for(const entry of exactDates){
+    const dateISO = String(entry?.date || entry?.exactDate || '').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) continue;
+    exactByDate.set(dateISO, normalizeDaySongEntry(entry, 'exact-date'));
+  }
+
+  for(const entry of gregorianRecurring){
+    const monthDay = String(entry?.monthDay || '').trim();
+    if(!/^\d{2}-\d{2}$/.test(monthDay)) continue;
+    recurringByMonthDay.set(monthDay, normalizeDaySongEntry(entry, 'gregorian-recurring'));
+  }
+
+  return { exactByDate, recurringByMonthDay };
+}
+
 function hash32_FNV1a(str){
   let h = 0x811c9dc5;
   for(let i=0;i<str.length;i++){
@@ -366,6 +399,17 @@ function hash32_FNV1a(str){
 }
 
 function silentSoundForDate(dateISO){
+  const setDaySongs = state.data.setDaySongs;
+
+  if(setDaySongs){
+    const exactMatch = setDaySongs.exactByDate.get(dateISO);
+    if(exactMatch) return exactMatch;
+
+    const monthDay = dateISO.slice(5); // "MM-DD"
+    const recurringMatch = setDaySongs.recurringByMonthDay.get(monthDay);
+    if(recurringMatch) return recurringMatch;
+  }
+
   const songs = state.data.silentSounds;
   if(!songs || songs.length === 0) return null;
 
@@ -1463,15 +1507,31 @@ function renderInspector(){
     t.textContent = 'Silent Sounds (Song of the Day)';
     div.appendChild(t);
 
-    const a = document.createElement('a');
-    a.href = snap.silentSong.url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.className = 'songlink';
-    a.textContent = snap.silentSong.artists
+    const label = snap.silentSong.artists
       ? `${snap.silentSong.title} — ${snap.silentSong.artists}`
       : snap.silentSong.title;
-    div.appendChild(a);
+
+    if(snap.silentSong.url){
+      const a = document.createElement('a');
+      a.href = snap.silentSong.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.className = 'songlink';
+      a.textContent = label;
+      div.appendChild(a);
+    }else{
+      const s = document.createElement('div');
+      s.className = 'songlink';
+      s.textContent = label;
+      div.appendChild(s);
+    }
+
+    if(snap.silentSong.note){
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = snap.silentSong.note;
+      div.appendChild(n);
+    }
 
     p.appendChild(div);
   }
@@ -2085,6 +2145,9 @@ async function loadData(){
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
   const silentRes = await fetch('./data/AFdS_Silent_Sounds.csv');
 
+  let setDaySongsRes = null;
+  try{ setDaySongsRes = await fetch('./data/Set_Day_Songs.json'); }catch(e){ setDaySongsRes = null; }
+
   let oneOffRes = null;
   try{ oneOffRes = await fetch('./data/AFdS_OneOff_StarSystems.csv'); }catch(e){ oneOffRes = null; }
 
@@ -2120,6 +2183,13 @@ async function loadData(){
   }
 
   state.data.silentSounds = silentSounds;
+
+  let setDaySongsRaw = null;
+  if(setDaySongsRes && setDaySongsRes.ok){
+    setDaySongsRaw = await setDaySongsRes.json();
+  }
+
+  state.data.setDaySongs = buildSetDaySongsIndex(setDaySongsRaw);
 
   let oneOffRaw = [];
   if(oneOffRes && oneOffRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await oneOffRes.text()));
