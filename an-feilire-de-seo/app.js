@@ -1331,10 +1331,6 @@ function snapshotDay(dateISO){
     ? gyForDate.filter(d => isStandardCategory(d.category) && d.showInInspector)
     : [];
 
-  const oneOffs = (state.filters.oneOff && state.data.oneOffDefs)
-    ? oneOffsForDate(dateISO, 'inspector')
-    : [];
-
   const silentSong = silentSoundForDate(dateISO);
 
   state.snapshot = {
@@ -1397,16 +1393,20 @@ function renderInspector(){
     for(const s of specials){
       const div = document.createElement('div');
       div.className = 'eventitem';
+
       const t = document.createElement('div');
       t.className = 'title';
       t.textContent = s.title;
       div.appendChild(t);
-      if(s.notes){
+
+      const inspectorNote = gregorianInspectorNote(s, snap.dateISO);
+      if(inspectorNote){
         const n = document.createElement('div');
         n.className = 'note';
-        n.textContent = s.notes;
+        n.textContent = inspectorNote;
         div.appendChild(n);
       }
+
       p.appendChild(div);
     }
   }
@@ -1423,7 +1423,7 @@ function renderInspector(){
       t.textContent = s.title;
       div.appendChild(t);
 
-      const inspectorNote = standardInspectorNote(s, snap.dateISO);
+      const inspectorNote = gregorianInspectorNote(s, snap.dateISO);
       if(inspectorNote){
         const n = document.createElement('div');
         n.className = 'note';
@@ -1559,8 +1559,26 @@ function daysInclusive(startISO, endISO){
   return Math.floor(end.diff(start, 'days').days + 1);
 }
 
-function standardInspectorNote(def, dateISO){
-  if(def.id !== 'TM_TIME') return def.notes || '';
+// TM Time Helpers
+function normalizeKey(s){
+  return String(s || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '');
+}
+
+function isTMTime(def){
+  const idKey = normalizeKey(def.id);
+  const titleKey = normalizeKey(def.title);
+
+  return (
+    idKey === 'TMTIME' ||
+    titleKey === 'TMTIME'
+  );
+}
+
+function gregorianInspectorNote(def, dateISO){
+  if(!isTMTime(def)) return def.notes || '';
 
   const occ = activeGregorianOccurrenceForDate(def, dateISO);
   if(!occ) return def.notes || '';
@@ -1570,7 +1588,7 @@ function standardInspectorNote(def, dateISO){
   const dayNo = Math.floor(current.diff(start, 'days').days) + 1;
   const totalDays = daysInclusive(occ.startISO, occ.endISO);
 
-  return `TM Time - The Original Period Together - Day ${dayNo} of ${totalDays}`;
+  return `The Original Period Together - Day ${dayNo} of ${totalDays}`;
 }
 
 // ---------- +more popover ----------
