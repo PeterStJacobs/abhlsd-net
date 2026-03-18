@@ -109,6 +109,16 @@ function parseCSV(text){
   return out;
 }
 
+async function fetchTextFirstAvailable(paths){
+  for(const path of paths){
+    try{
+      const res = await fetch(path, { cache: 'no-store' });
+      if(res.ok) return await res.text();
+    }catch(e){}
+  }
+  return '';
+}
+
 function toBool(v){
   if(typeof v === 'boolean') return v;
   const s = String(v ?? '').trim().toLowerCase();
@@ -491,7 +501,6 @@ function buildOverflowAssignments(){
 
   let cursor = DateTime.fromISO(minStart, {zone:'UTC'}).startOf('day');
   const end = DateTime.fromISO(maxEnd, {zone:'UTC'}).startOf('day');
-
   let songIdx = 0;
 
   while(cursor <= end){
@@ -523,7 +532,9 @@ function buildOverflowAssignments(){
 }
 
 function overflowSongsForDate(dateISO){
-  return state.data.overflowAssignments?.get(dateISO) || [];
+  const fromMap = state.data.overflowAssignments?.get(dateISO);
+  if(fromMap && fromMap.length) return fromMap;
+  return [];
 }
 
 // ---------- Rendering ----------
@@ -2276,7 +2287,6 @@ async function loadData(){
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
   const silentRes = await fetch('./data/AFdS_Silent_Sounds.csv');
-  const overflowRes = await fetch('./data/AFdS_Overflow.csv');
 
   let setDaySongsRes = null;
   try{ setDaySongsRes = await fetch('./data/Set_Day_Songs.json'); }catch(e){ setDaySongsRes = null; }
@@ -2317,7 +2327,10 @@ async function loadData(){
 
   state.data.silentSounds = silentSounds;
 
-  const overflowText = await overflowRes.text();
+  const overflowText = await fetchTextFirstAvailable([
+    './Data/AFdS_Overflow.csv',
+    './data/AFdS_Overflow.csv'
+  ]);
   const overflowRaw = parseCSV(overflowText);
 
   const overflowSounds = [];
