@@ -43,7 +43,7 @@ const state = {
     oneOffDefs: null,
     silentSounds: null,
     overflowSounds: null,
-    overflowAssignments: null,
+    overflowSlotOrder: null,
     setDaySongs: null,
   }
 };
@@ -115,6 +115,16 @@ async function fetchTextFirstAvailable(paths){
       const res = await fetch(path, { cache: 'no-store' });
       if(res.ok) return await res.text();
     }catch(e){}
+  }
+  return '';
+}
+
+function pickField(row, candidates){
+  for(const key of candidates){
+    const v = row?.[key];
+    if(v !== undefined && v !== null && String(v).trim() !== ''){
+      return String(v).trim();
+    }
   }
   return '';
 }
@@ -482,12 +492,10 @@ function seoianSongSlotsForDate(dateISO){
   };
 }
 
-function buildOverflowAssignments(){
-  const out = new Map();
-  const songs = state.data.overflowSounds || [];
+function buildOverflowSlotOrder(){
+  const out = [];
   const ranges = state.data.ranges || [];
-
-  if(!songs.length || !ranges.length) return out;
+  if(!ranges.length) return out;
 
   let minStart = null;
   let maxEnd = null;
@@ -501,28 +509,19 @@ function buildOverflowAssignments(){
 
   let cursor = DateTime.fromISO(minStart, {zone:'UTC'}).startOf('day');
   const end = DateTime.fromISO(maxEnd, {zone:'UTC'}).startOf('day');
-  let songIdx = 0;
 
   while(cursor <= end){
     const dateISO = cursor.toISODate();
     const slots = seoianSongSlotsForDate(dateISO);
     const overlaps = slots.overlaps || [];
 
-    if(overlaps.length){
-      const assigned = [];
-
-      for(const slot of overlaps){
-        const song = songs[songIdx % songs.length];
-        assigned.push({
-          ...song,
-          seoianLabel: slot.seoianLabel,
-          monthNo: slot.monthNo,
-          day: slot.day
-        });
-        songIdx++;
-      }
-
-      out.set(dateISO, assigned);
+    for(const slot of overlaps){
+      out.push({
+        dateISO,
+        seoianLabel: slot.seoianLabel,
+        monthNo: slot.monthNo,
+        day: slot.day
+      });
     }
 
     cursor = cursor.plus({days:1});
@@ -532,9 +531,32 @@ function buildOverflowAssignments(){
 }
 
 function overflowSongsForDate(dateISO){
-  const fromMap = state.data.overflowAssignments?.get(dateISO);
-  if(fromMap && fromMap.length) return fromMap;
-  return [];
+  const songs = state.data.overflowSounds || [];
+  const slotOrder = state.data.overflowSlotOrder || [];
+
+  if(!songs.length || !slotOrder.length) return [];
+
+  const matches = slotOrder.filter(slot => slot.dateISO === dateISO);
+  if(!matches.length) return [];
+
+  return matches.map((slot, idx) => {
+    const absoluteIndex = slotOrder.findIndex(
+      s =>
+        s.dateISO === slot.dateISO &&
+        s.seoianLabel === slot.seoianLabel &&
+        s.monthNo === slot.monthNo &&
+        s.day === slot.day
+    );
+
+    const song = songs[absoluteIndex % songs.length];
+    return {
+      ...song,
+      seoianLabel: slot.seoianLabel,
+      monthNo: slot.monthNo,
+      day: slot.day,
+      sequenceInDay: idx
+    };
+  });
 }
 
 // ---------- Rendering ----------
@@ -1679,6 +1701,25 @@ function renderInspector(){
     }
   }
 
+  if((snap.songSlots?.overlaps?.length || 0) > 0 && (!snap.overflowSongs || !snap.overflowSongs.length)){
+    any = true;
+
+    const div = document.createElement('div');
+    div.className = 'eventitem songofday';
+
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = `Overflow: ${snap.songSlots.overlaps.map(x => x.seoianLabel).join(' | ')}`;
+    div.appendChild(t);
+
+    const n = document.createElement('div');
+    n.className = 'note';
+    n.textContent = 'Overlap date detected, but no Overflow track was assigned. This usually means AFdS_Overflow.csv was not loaded from the site.';
+    div.appendChild(n);
+
+    p.appendChild(div);
+  }
+
   if(!any) p.innerHTML = '<div class="muted">(no periods)</div>';
 
   const f = el('inspectorFacts');
@@ -2312,9 +2353,9 @@ async function loadData(){
 
   const silentSounds = [];
   for(const r of silentRaw){
-    const url = (r['Spotify URL'] || r.Spotify_URL || r.spotify_url || '').trim();
-    const title = (r['Song Title'] || r.Song_Title || r.title || '').trim();
-    const artists = (r['Artists'] || r.Artist || r.artists || '').trim();
+    const url = pickField(r, ['Spotify URL', 'Spotify_URL', 'spotify_url', 'URL', 'Url', 'url']);
+    const title = pickField(r, ['Song Title', 'Song_Title', 'title', 'Title']);
+    const artists = pickField(r, ['Artists', 'Artist', 'artists', 'artist']);
 
     if(!url) continue;
 
@@ -2335,9 +2376,9 @@ async function loadData(){
 
   const overflowSounds = [];
   for(const r of overflowRaw){
-    const url = (r['Spotify URL'] || r.Spotify_URL || r.spotify_url || '').trim();
-    const title = (r['Song Title'] || r.Song_Title || r.title || '').trim();
-    const artists = (r['Artists'] || r.Artist || r.artists || '').trim();
+    const url = pickField(r, ['Spotify URL', 'Spotify_URL', 'spotify_url', 'URL', 'Url', 'url']);
+    const title = pickField(r, ['Song Title', 'Song_Title', 'title', 'Title']);
+    const artists = pickField(r, ['Artists', 'Artist', 'artists', 'artist']);
 
     if(!url) continue;
 
@@ -2484,7 +2525,7 @@ async function loadData(){
   state.data.syByKey = syByKey;
   state.data.gyDefs = gyDefs;
   state.data.oneOffDefs = oneOffDefs;
-  state.data.overflowAssignments = buildOverflowAssignments();
+  state.data.overflowSlotOrder = buildOverflowSlotOrder();
 }
 
 (async function init(){
