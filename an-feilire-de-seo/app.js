@@ -42,6 +42,8 @@ const state = {
     gyDefs: null,
     oneOffDefs: null,
     silentSounds: null,
+    overflowSounds: null,
+    overflowAssignments: null,
     setDaySongs: null,
   }
 };
@@ -356,7 +358,7 @@ function oneOffSpanISO(def){
   };
 }
 
-// ---------- Silent Sounds (Song of the Day) ----------
+// ---------- Silent Sounds / Overflow ----------
 function normalizeDaySongEntry(entry, source){
   return {
     title: String(entry?.title || '').trim() || 'Silent Sounds Track',
@@ -416,6 +418,112 @@ function silentSoundForDate(dateISO){
   const key = `SilentSounds|${dateISO}`;
   const idx = hash32_FNV1a(key) % songs.length;
   return songs[idx];
+}
+
+function activeSeoianMonthDayPairs(dateISO){
+  const act = activeSuperMonths(dateISO);
+  if(!act || act.length === 0) return [];
+
+  const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+  const pairs = [];
+
+  for(const r of act){
+    const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
+    const day = dUTC.diff(startUTC, 'days').days + 1;
+    const dayInt = Math.floor(day + 1e-9);
+
+    if(dayInt >= 1){
+      pairs.push({
+        monthNo: r.monthNo,
+        day: dayInt,
+        monthName: r.monthName,
+        start: r.start
+      });
+    }
+  }
+
+  pairs.sort((a,b)=> a.start.localeCompare(b.start) || (a.monthNo - b.monthNo) || (a.day - b.day));
+  return pairs;
+}
+
+function seoianDateLabelFromPair(dateISO, pair){
+  const sy = seoianYearForGregorian(dateISO);
+  return `${pad2(pair.day)}/${pad2(pair.monthNo)}/${String(sy).padStart(4,'0')}`;
+}
+
+function seoianSongSlotsForDate(dateISO){
+  const pairs = activeSeoianMonthDayPairs(dateISO);
+  if(!pairs.length){
+    return { primary: null, overlaps: [] };
+  }
+
+  const primary = pairs[pairs.length - 1];
+  const overlaps = pairs.slice(0, -1);
+
+  return {
+    primary: {
+      ...primary,
+      seoianLabel: seoianDateLabelFromPair(dateISO, primary)
+    },
+    overlaps: overlaps.map(p => ({
+      ...p,
+      seoianLabel: seoianDateLabelFromPair(dateISO, p)
+    }))
+  };
+}
+
+function buildOverflowAssignments(){
+  const out = new Map();
+  const songs = state.data.overflowSounds || [];
+  const ranges = state.data.ranges || [];
+
+  if(!songs.length || !ranges.length) return out;
+
+  let minStart = null;
+  let maxEnd = null;
+
+  for(const r of ranges){
+    if(!minStart || r.start < minStart) minStart = r.start;
+    if(!maxEnd || r.end > maxEnd) maxEnd = r.end;
+  }
+
+  if(!minStart || !maxEnd) return out;
+
+  let cursor = DateTime.fromISO(minStart, {zone:'UTC'}).startOf('day');
+  const end = DateTime.fromISO(maxEnd, {zone:'UTC'}).startOf('day');
+
+  let songIdx = 0;
+
+  while(cursor <= end){
+    const dateISO = cursor.toISODate();
+    const slots = seoianSongSlotsForDate(dateISO);
+    const overlaps = slots.overlaps || [];
+
+    if(overlaps.length){
+      const assigned = [];
+
+      for(const slot of overlaps){
+        const song = songs[songIdx % songs.length];
+        assigned.push({
+          ...song,
+          seoianLabel: slot.seoianLabel,
+          monthNo: slot.monthNo,
+          day: slot.day
+        });
+        songIdx++;
+      }
+
+      out.set(dateISO, assigned);
+    }
+
+    cursor = cursor.plus({days:1});
+  }
+
+  return out;
+}
+
+function overflowSongsForDate(dateISO){
+  return state.data.overflowAssignments?.get(dateISO) || [];
 }
 
 // ---------- Rendering ----------
@@ -948,32 +1056,6 @@ function enabledForCategory(cat){
 
 function enabledForOneOff(){ return !!state.filters.oneOff; }
 
-function activeSeoianMonthDayPairs(dateISO){
-  const act = activeSuperMonths(dateISO);
-  if(!act || act.length === 0) return [];
-
-  const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
-  const pairs = [];
-
-  for(const r of act){
-    const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
-    const day = dUTC.diff(startUTC, 'days').days + 1;
-    const dayInt = Math.floor(day + 1e-9);
-
-    if(dayInt >= 1){
-      pairs.push({
-        monthNo: r.monthNo,
-        day: dayInt,
-        monthName: r.monthName,
-        start: r.start
-      });
-    }
-  }
-
-  pairs.sort((a,b)=> a.start.localeCompare(b.start) || (a.monthNo - b.monthNo) || (a.day - b.day));
-  return pairs;
-}
-
 function syEventDefsForDate(dateISO){
   if(!state.data.syByKey) return [];
 
@@ -1380,6 +1462,7 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 // ---------- Snapshot: Day Inspector ----------
 function snapshotDay(dateISO){
   const seo = canonicalSeoianDate(dateISO);
+  const songSlots = seoianSongSlotsForDate(dateISO);
 
   const periods = state.filters.superMonths
     ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
@@ -1392,6 +1475,7 @@ function snapshotDay(dateISO){
     : [];
 
   const silentSong = silentSoundForDate(dateISO);
+  const overflowSongs = overflowSongsForDate(dateISO);
 
   state.snapshot = {
     dateISO,
@@ -1400,6 +1484,8 @@ function snapshotDay(dateISO){
     dayDefs,
     oneOffs,
     silentSong,
+    overflowSongs,
+    songSlots,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
     tzAtSnapshot: { tamaraTZ: state.tamaraTZ, martinTZ: state.martinTZ }
@@ -1504,7 +1590,9 @@ function renderInspector(){
 
     const t = document.createElement('div');
     t.className = 'title';
-    t.textContent = 'Silent Sounds (Song of the Day)';
+    t.textContent = snap.songSlots?.primary?.seoianLabel
+      ? `Silent Sounds: ${snap.songSlots.primary.seoianLabel}`
+      : 'Silent Sounds (Song of the Day)';
     div.appendChild(t);
 
     const label = snap.silentSong.artists
@@ -1534,6 +1622,50 @@ function renderInspector(){
     }
 
     p.appendChild(div);
+  }
+
+  if(snap.overflowSongs && snap.overflowSongs.length){
+    any = true;
+
+    for(const song of snap.overflowSongs){
+      const div = document.createElement('div');
+      div.className = 'eventitem songofday';
+
+      const t = document.createElement('div');
+      t.className = 'title';
+      t.textContent = song.seoianLabel
+        ? `Overflow: ${song.seoianLabel}`
+        : 'Overflow';
+      div.appendChild(t);
+
+      const label = song.artists
+        ? `${song.title} — ${song.artists}`
+        : song.title;
+
+      if(song.url){
+        const a = document.createElement('a');
+        a.href = song.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.className = 'songlink';
+        a.textContent = label;
+        div.appendChild(a);
+      }else{
+        const s = document.createElement('div');
+        s.className = 'songlink';
+        s.textContent = label;
+        div.appendChild(s);
+      }
+
+      if(song.note){
+        const n = document.createElement('div');
+        n.className = 'note';
+        n.textContent = song.note;
+        div.appendChild(n);
+      }
+
+      p.appendChild(div);
+    }
   }
 
   if(!any) p.innerHTML = '<div class="muted">(no periods)</div>';
@@ -2144,6 +2276,7 @@ async function loadData(){
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
   const silentRes = await fetch('./data/AFdS_Silent_Sounds.csv');
+  const overflowRes = await fetch('./data/AFdS_Overflow.csv');
 
   let setDaySongsRes = null;
   try{ setDaySongsRes = await fetch('./data/Set_Day_Songs.json'); }catch(e){ setDaySongsRes = null; }
@@ -2183,6 +2316,26 @@ async function loadData(){
   }
 
   state.data.silentSounds = silentSounds;
+
+  const overflowText = await overflowRes.text();
+  const overflowRaw = parseCSV(overflowText);
+
+  const overflowSounds = [];
+  for(const r of overflowRaw){
+    const url = (r['Spotify URL'] || r.Spotify_URL || r.spotify_url || '').trim();
+    const title = (r['Song Title'] || r.Song_Title || r.title || '').trim();
+    const artists = (r['Artists'] || r.Artist || r.artists || '').trim();
+
+    if(!url) continue;
+
+    overflowSounds.push({
+      url,
+      title: title || 'Spotify Track',
+      artists: artists || ''
+    });
+  }
+
+  state.data.overflowSounds = overflowSounds;
 
   let setDaySongsRaw = null;
   if(setDaySongsRes && setDaySongsRes.ok){
@@ -2318,6 +2471,7 @@ async function loadData(){
   state.data.syByKey = syByKey;
   state.data.gyDefs = gyDefs;
   state.data.oneOffDefs = oneOffDefs;
+  state.data.overflowAssignments = buildOverflowAssignments();
 }
 
 (async function init(){
