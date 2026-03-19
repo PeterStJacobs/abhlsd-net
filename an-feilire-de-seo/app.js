@@ -1026,7 +1026,7 @@ function renderListView(){
     const card = document.createElement('div');
     card.style.border='1px solid var(--line)';
     card.style.borderRadius='14px';
-    card.style.background='#fff';
+    card.style.background='rgba(255,255,255,0.08)';
     card.style.padding='10px 12px';
 
     const head = document.createElement('div');
@@ -1773,7 +1773,7 @@ function renderInspector(){
     img.style.objectPosition = 'center';
     img.style.marginTop = '8px';
     img.style.borderRadius = '12px';
-    img.style.background = '#fff';
+    img.style.background = 'rgba(255,255,255,0.08)';
 
     img.addEventListener('error', () => {
       img.remove();
