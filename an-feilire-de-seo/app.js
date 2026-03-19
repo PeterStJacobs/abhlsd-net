@@ -589,6 +589,153 @@ function overflowSongsForDate(dateISO){
 // ---------- Rendering ----------
 const el = (id)=>document.getElementById(id);
 
+let fridayFlowerPreview = null;
+let fridayFlowerPreviewHideTimer = null;
+
+function clearFridayFlowerPreviewHideTimer(){
+  if(fridayFlowerPreviewHideTimer){
+    clearTimeout(fridayFlowerPreviewHideTimer);
+    fridayFlowerPreviewHideTimer = null;
+  }
+}
+
+function ensureFridayFlowerPreview(){
+  if(fridayFlowerPreview) return fridayFlowerPreview;
+
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.inset = '0';
+  overlay.style.display = 'none';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.style.padding = '24px';
+  overlay.style.background = 'rgba(0,0,0,0.45)';
+  overlay.style.zIndex = '9999';
+  overlay.style.opacity = '0';
+  overlay.style.transition = 'opacity 120ms ease';
+
+  const img = document.createElement('img');
+  img.alt = 'Friday Flowers preview';
+  img.style.display = 'block';
+  img.style.maxWidth = '88vw';
+  img.style.maxHeight = '88vh';
+  img.style.width = 'auto';
+  img.style.height = 'auto';
+  img.style.objectFit = 'contain';
+  img.style.borderRadius = '16px';
+  img.style.boxShadow = '0 18px 40px rgba(0,0,0,0.35)';
+  img.style.background = '#fff';
+
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('mouseenter', ()=>{
+    clearFridayFlowerPreviewHideTimer();
+  });
+
+  overlay.addEventListener('mouseleave', ()=>{
+    hideFridayFlowerPreview(true);
+  });
+
+  overlay.addEventListener('click', (ev)=>{
+    if(ev.target === overlay){
+      hideFridayFlowerPreview(true);
+    }
+  });
+
+  document.addEventListener('keydown', (ev)=>{
+    if(ev.key === 'Escape'){
+      hideFridayFlowerPreview(true);
+    }
+  });
+
+  fridayFlowerPreview = { overlay, img };
+  return fridayFlowerPreview;
+}
+
+function showFridayFlowerPreview(src, alt='Friday Flowers'){
+  if(!src) return;
+
+  clearFridayFlowerPreviewHideTimer();
+
+  const { overlay, img } = ensureFridayFlowerPreview();
+  img.src = src;
+  img.alt = alt;
+  overlay.dataset.openSrc = src;
+
+  if(overlay.style.display !== 'flex'){
+    overlay.style.display = 'flex';
+    requestAnimationFrame(()=>{
+      overlay.style.opacity = '1';
+    });
+  }else{
+    overlay.style.opacity = '1';
+  }
+}
+
+function hideFridayFlowerPreview(immediate=false){
+  const ref = ensureFridayFlowerPreview();
+  const { overlay } = ref;
+
+  clearFridayFlowerPreviewHideTimer();
+
+  if(immediate){
+    overlay.style.opacity = '0';
+    setTimeout(()=>{
+      overlay.style.display = 'none';
+      overlay.dataset.openSrc = '';
+    }, 120);
+    return;
+  }
+
+  fridayFlowerPreviewHideTimer = setTimeout(()=>{
+    overlay.style.opacity = '0';
+    setTimeout(()=>{
+      overlay.style.display = 'none';
+      overlay.dataset.openSrc = '';
+    }, 120);
+  }, 90);
+}
+
+function attachFridayFlowerPreview(imgEl){
+  if(!imgEl) return;
+
+  imgEl.style.cursor = 'zoom-in';
+  imgEl.tabIndex = 0;
+
+  imgEl.addEventListener('mouseenter', ()=>{
+    showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
+  });
+
+  imgEl.addEventListener('mouseleave', ()=>{
+    hideFridayFlowerPreview(false);
+  });
+
+  imgEl.addEventListener('focus', ()=>{
+    showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
+  });
+
+  imgEl.addEventListener('blur', ()=>{
+    hideFridayFlowerPreview(true);
+  });
+
+  imgEl.addEventListener('click', (ev)=>{
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    const ref = ensureFridayFlowerPreview();
+    const isSameImageOpen =
+      ref.overlay.style.display === 'flex' &&
+      ref.overlay.dataset.openSrc === imgEl.src;
+
+    if(isSameImageOpen){
+      hideFridayFlowerPreview(true);
+    }else{
+      showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
+    }
+  });
+}
+
 function setUpTZList(){
   let zones = [];
 
@@ -1775,6 +1922,8 @@ function renderInspector(){
     img.style.borderRadius = '12px';
     img.style.background = 'rgba(255,255,255,0.08)';
 
+    attachFridayFlowerPreview(img);
+      
     img.addEventListener('error', () => {
       img.remove();
       const n = document.createElement('div');
