@@ -14,6 +14,33 @@ const DEFAULTS = {
 
 const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
+const FRIDAY_FLOWERS = {
+  heading: 'Friday Flowers',
+  basePath: './images/friday-flowers/',
+  count: 6,              // **** update this when you add more images ****
+  extension: '.jpg',
+  maxHeightPx: 220
+};
+
+function isFridayDateISO(dateISO){
+  const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
+  return dt.weekday === 5; // Luxon: Mon=1 ... Fri=5 ... Sun=7
+}
+
+function fridayFlowerForDate(dateISO){
+  if(!isFridayDateISO(dateISO)) return null;
+  if(!FRIDAY_FLOWERS.count || FRIDAY_FLOWERS.count < 1) return null;
+
+  const idx = (hash32_FNV1a(`FridayFlowers|${dateISO}`) % FRIDAY_FLOWERS.count) + 1;
+  const fileNo = String(idx).padStart(3, '0');
+
+  return {
+    heading: FRIDAY_FLOWERS.heading,
+    src: `${FRIDAY_FLOWERS.basePath}ff-${fileNo}${FRIDAY_FLOWERS.extension}`,
+    alt: `${FRIDAY_FLOWERS.heading} ${fileNo}`
+  };
+}
+
 // Luxon startOf('week') follows locale (often Monday). AFdS UI is SUN→SAT.
 function startOfWeekSunday(dt){
   // Luxon weekday: 1=Mon ... 7=Sun
@@ -1496,6 +1523,7 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 function snapshotDay(dateISO){
   const seo = canonicalSeoianDate(dateISO);
   const songSlots = seoianSongSlotsForDate(dateISO);
+  const fridayFlower = fridayFlowerForDate(dateISO);
 
   const periods = state.filters.superMonths
     ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
@@ -1518,6 +1546,7 @@ function snapshotDay(dateISO){
     oneOffs,
     silentSong,
     overflowSongs,
+    fridayFlower,
     songSlots,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
@@ -1717,6 +1746,44 @@ function renderInspector(){
     n.textContent = 'Overlap date detected, but no Overflow track was assigned. This usually means AFdS_Overflow.csv was not loaded from the site.';
     div.appendChild(n);
 
+    p.appendChild(div);
+  }
+
+    if(snap.fridayFlower){
+    any = true;
+
+    const div = document.createElement('div');
+    div.className = 'eventitem fridayflowers';
+
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = snap.fridayFlower.heading;
+    div.appendChild(t);
+
+    const img = document.createElement('img');
+    img.src = snap.fridayFlower.src;
+    img.alt = snap.fridayFlower.alt || snap.fridayFlower.heading;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+
+    img.style.display = 'block';
+    img.style.width = '100%';
+    img.style.maxHeight = `${FRIDAY_FLOWERS.maxHeightPx}px`;
+    img.style.objectFit = 'contain';
+    img.style.objectPosition = 'center';
+    img.style.marginTop = '8px';
+    img.style.borderRadius = '12px';
+    img.style.background = '#fff';
+
+    img.addEventListener('error', () => {
+      img.remove();
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = `Friday Flowers image not found: ${snap.fridayFlower.src}`;
+      div.appendChild(n);
+    });
+
+    div.appendChild(img);
     p.appendChild(div);
   }
 
