@@ -22,6 +22,24 @@ const FRIDAY_FLOWERS = {
   maxHeightPx: 220
 };
 
+
+const LUNAR_PHASES = {
+  synodicMonthDays: 29.530588853,
+  referenceNewMoonUTC: '2000-01-06T18:14:00Z',
+  markers: {
+    new: '●',
+    first: '◐',
+    full: '○',
+    last: '◑'
+  },
+  names: {
+    new: 'New Moon',
+    first: 'First Quarter',
+    full: 'Full Moon',
+    last: 'Last Quarter'
+  }
+};
+
 function isFridayDateISO(dateISO){
   const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
   return dt.weekday === 5; // Luxon: Mon=1 ... Fri=5 ... Sun=7
@@ -72,6 +90,7 @@ const state = {
     overflowSounds: null,
     overflowSlotOrder: null,
     setDaySongs: null,
+    lunarPhases: null,
   }
 };
 
@@ -319,6 +338,87 @@ function durationToHHMMCeilHalfHour(ms){
 function monthTitle(dateISO, displayTZ){
   const dt = DateTime.fromISO(dateISO, {zone:displayTZ});
   return dt.toFormat('LLLL yyyy');
+}
+
+
+function lunarPhaseKeyForIndex(idx){
+  const mod = ((idx % 4) + 4) % 4;
+  return ['new', 'first', 'full', 'last'][mod];
+}
+
+function lunarMarkerForPhaseKey(phaseKey){
+  return LUNAR_PHASES.markers[phaseKey] || '•';
+}
+
+function lunarPhaseNameForKey(phaseKey){
+  return LUNAR_PHASES.names[phaseKey] || 'Lunar Phase';
+}
+
+function buildLunarPhaseCache(){
+  const ranges = state.data.ranges || [];
+  const zone = state.displayTZ || 'UTC';
+
+  let minISO = null;
+  let maxISO = null;
+
+  for(const r of ranges){
+    if(!minISO || r.start < minISO) minISO = r.start;
+    if(!maxISO || r.end > maxISO) maxISO = r.end;
+  }
+
+  const startUTC = minISO
+    ? DateTime.fromISO(minISO, {zone:'UTC'}).minus({days:40}).startOf('day')
+    : DateTime.now().toUTC().minus({days:400}).startOf('day');
+  const endUTC = maxISO
+    ? DateTime.fromISO(maxISO, {zone:'UTC'}).plus({days:40}).endOf('day')
+    : DateTime.now().toUTC().plus({days:400}).endOf('day');
+
+  const quarterMs = (LUNAR_PHASES.synodicMonthDays * 86400000) / 4;
+  const epochMs = DateTime.fromISO(LUNAR_PHASES.referenceNewMoonUTC, {zone:'UTC'}).toMillis();
+
+  const firstIdx = Math.floor((startUTC.toMillis() - epochMs) / quarterMs) - 2;
+  const lastIdx = Math.ceil((endUTC.toMillis() - epochMs) / quarterMs) + 2;
+
+  const byDate = new Map();
+  const events = [];
+
+  for(let idx = firstIdx; idx <= lastIdx; idx++){
+    const eventUtcMs = epochMs + (idx * quarterMs);
+    if(eventUtcMs < startUTC.toMillis() || eventUtcMs > endUTC.toMillis()) continue;
+
+    const phaseKey = lunarPhaseKeyForIndex(idx);
+    const localDT = DateTime.fromMillis(eventUtcMs, {zone:'UTC'}).setZone(zone);
+    const dateISO = localDT.toISODate();
+
+    const event = {
+      phaseKey,
+      phaseName: lunarPhaseNameForKey(phaseKey),
+      marker: lunarMarkerForPhaseKey(phaseKey),
+      utcMs: eventUtcMs,
+      dateISO,
+      zone,
+      localDT,
+      localTime: localDT.toFormat('HH:mm'),
+      localLabel: `${localDT.toFormat('dd/LL/yyyy HH:mm')} ${zone}`
+    };
+
+    if(!byDate.has(dateISO)) byDate.set(dateISO, []);
+    byDate.get(dateISO).push(event);
+    events.push(event);
+  }
+
+  for(const [, arr] of byDate.entries()){
+    arr.sort((a,b)=> a.utcMs - b.utcMs);
+  }
+
+  state.data.lunarPhases = { zone, byDate, events };
+}
+
+function lunarPhasesForDate(dateISO){
+  if(!state.data.lunarPhases || state.data.lunarPhases.zone !== state.displayTZ){
+    buildLunarPhaseCache();
+  }
+  return state.data.lunarPhases?.byDate?.get(dateISO) || [];
 }
 
 // ---------- Data: SuperMonth ranges ----------
@@ -934,6 +1034,23 @@ function renderMonthView(){
       sd.textContent = seoianLabelWithOverlaps(dateISO);
       if(sd.textContent === '—') sd.textContent = '';
       day.appendChild(sd);
+
+      const lunarEvents = lunarPhasesForDate(dateISO);
+      if(lunarEvents.length){
+        const lunar = document.createElement('div');
+        lunar.className = 'lunar-markers';
+
+        for(const event of lunarEvents){
+          const marker = document.createElement('span');
+          marker.className = `lunar-marker lunar-${event.phaseKey}`;
+          marker.textContent = event.marker;
+          marker.title = `${event.phaseName} • ${event.localLabel}`;
+          marker.setAttribute('aria-label', `${event.phaseName} at ${event.localLabel}`);
+          lunar.appendChild(marker);
+        }
+
+        day.appendChild(lunar);
+      }
 
       const timed = (oneOffByDay.get(dateISO) || []).filter(ev => !isMultiDayOneOff(ev));
       const MAX_TIMED_VISIBLE = 2;
@@ -1671,6 +1788,7 @@ function snapshotDay(dateISO){
   const seo = canonicalSeoianDate(dateISO);
   const songSlots = seoianSongSlotsForDate(dateISO);
   const fridayFlower = fridayFlowerForDate(dateISO);
+  const lunarPhases = lunarPhasesForDate(dateISO);
 
   const periods = state.filters.superMonths
     ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
@@ -1694,6 +1812,7 @@ function snapshotDay(dateISO){
     silentSong,
     overflowSongs,
     fridayFlower,
+    lunarPhases,
     songSlots,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
@@ -1786,6 +1905,29 @@ function renderInspector(){
         n.textContent = ev.notes;
         div.appendChild(n);
       }
+
+      p.appendChild(div);
+    }
+  }
+
+
+
+  if(snap.lunarPhases && snap.lunarPhases.length){
+    any = true;
+
+    for(const phase of snap.lunarPhases){
+      const div = document.createElement('div');
+      div.className = 'eventitem lunarphase';
+
+      const t = document.createElement('div');
+      t.className = 'title';
+      t.textContent = `${phase.marker} ${phase.phaseName}`;
+      div.appendChild(t);
+
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = `Occurs at ${phase.localTime} ${phase.zone}`;
+      div.appendChild(n);
 
       p.appendChild(div);
     }
@@ -2436,7 +2578,13 @@ function bindControls(){
 
   el('displayTZ').addEventListener('change', (e)=>{
     state.displayTZ = e.target.value;
-    render();
+    buildLunarPhaseCache();
+
+    if(state.snapshot?.dateISO){
+      snapshotDay(state.snapshot.dateISO);
+    }else{
+      render();
+    }
   });
 
   el('btnFilters').addEventListener('click', ()=>{
@@ -2742,6 +2890,7 @@ async function loadData(){
   state.data.gyDefs = gyDefs;
   state.data.oneOffDefs = oneOffDefs;
   state.data.overflowSlotOrder = buildOverflowSlotOrder();
+  buildLunarPhaseCache();
 }
 
 (async function init(){
