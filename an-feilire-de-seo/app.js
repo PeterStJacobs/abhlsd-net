@@ -1,3 +1,5 @@
+import * as Astronomy from 'https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/esm/astronomy.js';
+
 const { DateTime } = luxon;
 
 const TZKEY_MAP = {
@@ -24,8 +26,6 @@ const FRIDAY_FLOWERS = {
 
 
 const LUNAR_PHASES = {
-  synodicMonthDays: 29.530588853,
-  referenceNewMoonUTC: '2000-01-06T18:14:00Z',
   markers: {
     new: '●',
     first: '◐',
@@ -36,7 +36,7 @@ const LUNAR_PHASES = {
     new: 'New Moon',
     first: 'First Quarter',
     full: 'Full Moon',
-    last: 'Last Quarter'
+    last: 'Third Quarter'
   }
 };
 
@@ -341,17 +341,18 @@ function monthTitle(dateISO, displayTZ){
 }
 
 
-function lunarPhaseKeyForIndex(idx){
-  const mod = ((idx % 4) + 4) % 4;
-  return ['new', 'first', 'full', 'last'][mod];
+function lunarPhaseKeyFromQuarter(quarter){
+  return ['new', 'first', 'full', 'last'][quarter] || null;
 }
 
-function lunarMarkerForPhaseKey(phaseKey){
-  return LUNAR_PHASES.markers[phaseKey] || '•';
+function lunarMarkerForQuarter(quarter){
+  const key = lunarPhaseKeyFromQuarter(quarter);
+  return key ? (LUNAR_PHASES.markers[key] || '•') : '•';
 }
 
-function lunarPhaseNameForKey(phaseKey){
-  return LUNAR_PHASES.names[phaseKey] || 'Lunar Phase';
+function lunarPhaseNameForQuarter(quarter){
+  const key = lunarPhaseKeyFromQuarter(quarter);
+  return key ? (LUNAR_PHASES.names[key] || 'Lunar Phase') : 'Lunar Phase';
 }
 
 function buildLunarPhaseCache(){
@@ -369,42 +370,48 @@ function buildLunarPhaseCache(){
   const startUTC = minISO
     ? DateTime.fromISO(minISO, {zone:'UTC'}).minus({days:40}).startOf('day')
     : DateTime.now().toUTC().minus({days:400}).startOf('day');
+
   const endUTC = maxISO
     ? DateTime.fromISO(maxISO, {zone:'UTC'}).plus({days:40}).endOf('day')
     : DateTime.now().toUTC().plus({days:400}).endOf('day');
 
-  const quarterMs = (LUNAR_PHASES.synodicMonthDays * 86400000) / 4;
-  const epochMs = DateTime.fromISO(LUNAR_PHASES.referenceNewMoonUTC, {zone:'UTC'}).toMillis();
-
-  const firstIdx = Math.floor((startUTC.toMillis() - epochMs) / quarterMs) - 2;
-  const lastIdx = Math.ceil((endUTC.toMillis() - epochMs) / quarterMs) + 2;
-
   const byDate = new Map();
   const events = [];
+  const searchStart = startUTC.minus({minutes:1}).toJSDate();
+  const limitMs = endUTC.toMillis();
 
-  for(let idx = firstIdx; idx <= lastIdx; idx++){
-    const eventUtcMs = epochMs + (idx * quarterMs);
-    if(eventUtcMs < startUTC.toMillis() || eventUtcMs > endUTC.toMillis()) continue;
+  let mq = Astronomy.SearchMoonQuarter(searchStart);
 
-    const phaseKey = lunarPhaseKeyForIndex(idx);
-    const localDT = DateTime.fromMillis(eventUtcMs, {zone:'UTC'}).setZone(zone);
-    const dateISO = localDT.toISODate();
+  while(mq && mq.time && mq.time.date && mq.time.date.getTime() <= limitMs){
+    const quarter = mq.quarter;
+    const phaseKey = lunarPhaseKeyFromQuarter(quarter);
 
-    const event = {
-      phaseKey,
-      phaseName: lunarPhaseNameForKey(phaseKey),
-      marker: lunarMarkerForPhaseKey(phaseKey),
-      utcMs: eventUtcMs,
-      dateISO,
-      zone,
-      localDT,
-      localTime: localDT.toFormat('HH:mm'),
-      localLabel: `${localDT.toFormat('dd/LL/yyyy HH:mm')} ${zone}`
-    };
+    if(phaseKey){
+      const utcDate = mq.time.date;
+      const utcMs = utcDate.getTime();
+      const localDT = DateTime.fromJSDate(utcDate, {zone:'utc'}).setZone(zone);
+      const dateISO = localDT.toISODate();
 
-    if(!byDate.has(dateISO)) byDate.set(dateISO, []);
-    byDate.get(dateISO).push(event);
-    events.push(event);
+      const event = {
+        quarter,
+        phaseKey,
+        phaseName: lunarPhaseNameForQuarter(quarter),
+        marker: lunarMarkerForQuarter(quarter),
+        utcMs,
+        utcDate,
+        dateISO,
+        zone,
+        localDT,
+        localTime: localDT.toFormat('HH:mm'),
+        localLabel: `${localDT.toFormat('dd/LL/yyyy HH:mm')} ${zone}`
+      };
+
+      if(!byDate.has(dateISO)) byDate.set(dateISO, []);
+      byDate.get(dateISO).push(event);
+      events.push(event);
+    }
+
+    mq = Astronomy.NextMoonQuarter(mq);
   }
 
   for(const [, arr] of byDate.entries()){
