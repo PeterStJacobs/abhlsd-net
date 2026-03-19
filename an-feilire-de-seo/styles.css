@@ -498,6 +498,37 @@ body{
   line-height:1.2;
 }
 
+.lunar-markers{
+  margin-top:6px;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  min-height:16px;
+}
+
+.lunar-marker{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  font-size:12px;
+  line-height:1;
+  color:var(--text);
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.14);
+}
+
+.lunar-marker.lunar-new{
+  color:#111318;
+  background:rgba(232,236,255,0.92);
+}
+
+.lunar-marker.lunar-full{
+  background:rgba(255,255,255,0.18);
+}
+
 .day .g{
   font-size:11px;
   color:var(--muted);
@@ -607,6 +638,12 @@ body{
   margin-top:3px;
   font-size:12px;
   color:var(--muted);
+}
+
+.eventitem.lunarphase .title{
+  display:flex;
+  align-items:center;
+  gap:8px;
 }
 
 .eventitem.songofday .songlink{
