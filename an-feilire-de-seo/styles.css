@@ -155,7 +155,10 @@ body{
   justify-content:space-between;
   gap:12px;
   flex:0 0 auto;
-  backdrop-filter:blur(6px);
+  backdrop-filter: blur(6px);
+  position:relative;
+  z-index:30;
+  overflow:visible;
 }
 
 .nav{
@@ -175,12 +178,15 @@ body{
   align-items:flex-end;
   flex-wrap:wrap;
   justify-content:flex-end;
+  position:relative;
+  z-index:31;
 }
 
 .control{
   display:flex;
   flex-direction:column;
   gap:6px;
+  position:relative;
 }
 
 .control label{
@@ -269,8 +275,12 @@ body{
   background:rgba(0,31,99,0.96);
   color:var(--text);
   box-shadow:var(--shadow);
-  z-index:40;
+  z-index:200;
   backdrop-filter:blur(8px);
+}
+
+.cal-surface{
+  z-index:1;
 }
 
 .chk{
