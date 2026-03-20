@@ -449,33 +449,34 @@ body{
   border-radius:8px;
   padding:3px 8px;
   font-size:12px;
+  font-weight:700;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  border:1px solid rgba(255,255,255,0.12);
-  background:rgba(0,176,240,0.20);
-  color:#e8ecff;
+  border:none;
+  background:rgba(0,176,240,0.92);
+  color:#081225;
+  box-shadow:0 2px 8px rgba(0,0,0,0.18);
 }
 
 .bar.special{
-  background:rgba(255,255,0,0.18);
-  color:#fff8c7;
+  background:rgba(255,255,0,0.92);
+  color:#2c2a00;
 }
 
 .bar.standard{
-  background:rgba(0,176,80,0.20);
-  color:#dfffe9;
+  background:rgba(0,176,80,0.92);
+  color:#041d0d;
 }
 
 .bar.secondary{
-  background:rgba(112,48,160,0.18);
-  color:#f0ddff;
+  background:rgba(112,48,160,0.92);
+  color:#f5ecff;
 }
 
 .bar.oneoff{
-  background:rgba(237,125,49,0.20);
-  color:#ffe7d6;
-  border-color:rgba(255,255,255,0.14);
+  background:rgba(237,125,49,0.92);
+  color:#2a1303;
 }
 
 .bar:hover{
