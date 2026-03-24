@@ -19,7 +19,7 @@ const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const FRIDAY_FLOWERS = {
   heading: 'Friday Flowers',
   basePath: './images/friday-flowers/',
-  count: 47,              // **** update this when you add more images ****
+  count: 100,              // **** update this when you add more images ****
   extension: '.jpg',
   maxHeightPx: 220
 };
