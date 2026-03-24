@@ -479,6 +479,48 @@ body{
   color:#2a1303;
 }
 
+.bar{
+  border-radius:8px;
+  padding:3px 8px;
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  border:none;
+  box-shadow:0 2px 8px rgba(0,0,0,0.18);
+}
+
+.bar.yellow{
+  background:#FFFF00;
+  color:#2c2a00;
+}
+
+.bar.orange{
+  background:#ED7D31;
+  color:#2a1303;
+}
+
+.bar.red{
+  background:#FF0000;
+  color:#fff1f1;
+}
+
+.bar.green{
+  background:#00B050;
+  color:#041d0d;
+}
+
+.bar.blue{
+  background:#00B0F0;
+  color:#081225;
+}
+
+.bar.purple{
+  background:#7030A0;
+  color:#f5ecff;
+}
+
 .bar:hover{
   border-color:rgba(255,255,255,0.24);
 }
