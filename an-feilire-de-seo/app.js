@@ -1154,6 +1154,9 @@ function renderWeekView(){
       cell.appendChild(sub);
     }
 
+    const lunar = buildLunarMarkersEl(dateISO);
+    if(lunar) cell.appendChild(lunar);
+
     cell.addEventListener('mouseenter', ()=>{
       if(window.matchMedia('(max-width: 1040px)').matches) return;
       snapshotDay(dateISO);
@@ -1339,6 +1342,12 @@ function renderListView(){
     head.appendChild(h2);
 
     card.appendChild(head);
+
+    const lunar = buildLunarMarkersEl(dateISO);
+    if(lunar){
+      lunar.style.marginTop = '6px';
+      card.appendChild(lunar);
+    }
 
     const items = document.createElement('div');
     items.style.marginTop='8px';
@@ -2183,6 +2192,25 @@ function barClassForEvent(p){
     default:
       return 'bar';
   }
+}
+
+function buildLunarMarkersEl(dateISO, extraClass=''){
+  const lunarEvents = lunarPhasesForDate(dateISO);
+  if(!lunarEvents.length) return null;
+
+  const lunar = document.createElement('div');
+  lunar.className = extraClass ? `lunar-markers ${extraClass}` : 'lunar-markers';
+
+  for(const event of lunarEvents){
+    const marker = document.createElement('span');
+    marker.className = `lunar-marker lunar-${event.phaseKey}`;
+    marker.textContent = event.marker;
+    marker.title = `${event.phaseName} • ${event.localLabel}`;
+    marker.setAttribute('aria-label', `${event.phaseName} at ${event.localLabel}`);
+    lunar.appendChild(marker);
+  }
+
+  return lunar;
 }
 
 function recurringDayDefsForDate(dateISO, visibilityField='showOnCalendar'){
