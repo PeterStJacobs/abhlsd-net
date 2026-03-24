@@ -444,7 +444,7 @@ body{
   background:rgba(255,255,255,0.03);
 }
 .week-cell:nth-child(8n){ border-right:0; }
-
+/*
 .bar{
   border-radius:8px;
   padding:3px 8px;
@@ -478,6 +478,7 @@ body{
   background:rgba(237,125,49,0.92);
   color:#2a1303;
 }
+*/
 
 .bar{
   border-radius:8px;
@@ -517,6 +518,16 @@ body{
 }
 
 .bar.purple{
+  background:#7030A0;
+  color:#f5ecff;
+}
+
+.bar.supermonth-blue{
+  background:#00B0F0;
+  color:#081225;
+}
+
+.bar.supermonth-purple{
   background:#7030A0;
   color:#f5ecff;
 }
