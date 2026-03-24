@@ -2150,6 +2150,12 @@ function activePeriodsForISO(dateISO){
 }
 
 function barClassForEvent(p){
+  if(p.kind === 'supermonth'){
+    return (Number(p.monthNo || 0) % 2 === 0)
+      ? 'bar supermonth-purple'
+      : 'bar supermonth-blue';
+  }
+
   switch (Number(p.rank ?? 0)) {
     case 1: return 'bar yellow';
     case 2: return 'bar orange';
