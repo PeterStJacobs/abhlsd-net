@@ -405,11 +405,9 @@ body{
 .week-bars{
   display:grid;
   grid-template-columns: 70px repeat(7, 1fr);
-  left:4px;
-  right:4px;
   grid-auto-rows: 22px;
   row-gap: 2px;
-  column-gap: 0;
+  column-gap: 1px;
   padding: 6px 0 0 0;
   position: sticky;
   top: var(--week-dow-h);
