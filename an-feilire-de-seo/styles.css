@@ -412,11 +412,9 @@ body{
   position: sticky;
   top: var(--week-dow-h);
   z-index: 19;
-  background: #fff;
+  /* background: #fff; */
   border-bottom: 1px solid var(--line);
 }
-
-
 
 /* Hour grid */
 .week-grid{
