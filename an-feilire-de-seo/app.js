@@ -992,11 +992,12 @@ function renderMonthView(){
 
       for(const p of placed){
         const bar = document.createElement('div');
-        bar.className =
+        bar.className = barClassForEvent(p);
+        /* bar.className =
           (p.kind === 'special') ? 'bar special'
           : (p.kind === 'standard') ? 'bar standard'
           : (p.kind === 'oneoff') ? 'bar oneoff'
-          : ('bar' + (p.lane === 1 ? ' secondary' : ''));
+          : ('bar' + (p.lane === 1 ? ' secondary' : '')); */
 
         bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
         bar.style.gridRow = `${p.lane+1}`;
@@ -1175,11 +1176,13 @@ function renderWeekView(){
 
   for(const p of placed){
     const bar = document.createElement('div');
-    bar.className =
+    bar.className = barClassForEvent(p);
+    
+    /* bar.className =
       (p.kind === 'special') ? 'bar special' :
       (p.kind === 'standard') ? 'bar standard' :
       (p.kind === 'oneoff') ? 'bar oneoff' :
-      ('bar' + (p.lane === 1 ? ' secondary' : ''));
+      ('bar' + (p.lane === 1 ? ' secondary' : '')); */
 
     bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
     bar.style.gridRow = `${p.lane+1}`;
@@ -2144,6 +2147,19 @@ function activePeriodsForISO(dateISO){
     }
   }
   return out;
+}
+
+function barClassForEvent(p){
+  switch (Number(p.rank ?? 0)) {
+    case 1: return 'bar yellow';
+    case 2: return 'bar orange';
+    case 3: return 'bar red';
+    case 4: return 'bar green';
+    case 5: return 'bar blue';
+    case 6: return 'bar purple';
+    default:
+      return 'bar';
+  }
 }
 
 function recurringDayDefsForDate(dateISO, visibilityField='showOnCalendar'){
