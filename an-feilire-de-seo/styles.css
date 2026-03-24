@@ -999,10 +999,13 @@ body{
   border-radius:6px;
   padding:2px 4px;
   font-size:11px;
+  font-weight:700;
   line-height:1.15;
-  background:rgba(237,125,49,0.22);
-  color:#ffe7d6;
-  border:1px solid rgba(255,255,255,0.14);
+  background:#7030A0;
+  color:#f5ecff;
+  /* background:rgba(237,125,49,0.22);
+  color:#ffe7d6; */
+  border:1px solid rgba(255,255,255,0.22);
   overflow:hidden;
   white-space:nowrap;
   text-overflow:ellipsis;
