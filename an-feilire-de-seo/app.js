@@ -1240,52 +1240,54 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
 
   const byDay = groupOneOffsByDay(weekStartISO, weekEndISO, 'calendar');
 
-  const ROW_H = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--week-row-h')) || 56;
+  const ROW_H = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--week-row-h')
+  ) || 56;
+
   const MIN_H = 18;
 
   for(const [dateISO, events] of byDay.entries()){
+    const dayStart = DateTime.fromISO(dateISO, { zone: state.displayTZ }).startOf('day');
+    const dayEndExclusive = dayStart.plus({ days: 1 });
     const seen = new Set();
 
     for(const ev of events){
-      let start = ev.startLocal;
-      let remainingMin = ev.durationMinutes || 30;
+      const segStart = (ev.startLocal < dayStart) ? dayStart : ev.startLocal;
+      const segEnd   = (ev.endLocal > dayEndExclusive) ? dayEndExclusive : ev.endLocal;
 
-      while(remainingMin > 0){
-        const hourKey = `${dateISO}|${String(start.hour).padStart(2,'0')}`;
-        const cell = cellMap.get(hourKey);
-        const minInHour = start.minute;
-        const cap = 60 - minInHour;
-        const take = Math.min(remainingMin, cap);
+      if(segEnd <= segStart) continue;
 
-        if(cell){
-          const dedupeKey = [
-            ev.id || '',
-            ev.title || '',
-            dateISO,
-            String(start.hour).padStart(2,'0'),
-            String(start.minute).padStart(2,'0'),
-            String(take)
-          ].join('|');
+      const durationMin = Math.max(
+        1,
+        Math.round(segEnd.diff(segStart, 'minutes').minutes)
+      );
 
-          if(!seen.has(dedupeKey)){
-            seen.add(dedupeKey);
+      const hourKey = `${dateISO}|${String(segStart.hour).padStart(2,'0')}`;
+      const cell = cellMap.get(hourKey);
+      if(!cell) continue;
 
-            const block = document.createElement('div');
-            block.className = 'oneoff-block';
+      const dedupeKey = [
+        ev.id || '',
+        ev.title || '',
+        dateISO,
+        segStart.toISO(),
+        segEnd.toISO()
+      ].join('|');
 
-            const top = (minInHour / 60) * ROW_H;
-            const height = Math.max(MIN_H, (take / 60) * ROW_H);
+      if(seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
 
-            block.style.top = `${top}px`;
-            block.style.height = `${height}px`;
-            block.textContent = ev.title;
-            cell.appendChild(block);
-          }
-        }
+      const block = document.createElement('div');
+      block.className = 'oneoff-block';
 
-        remainingMin -= take;
-        start = start.plus({minutes: take});
-      }
+      const top = (segStart.minute / 60) * ROW_H;
+      const height = Math.max(MIN_H, (durationMin / 60) * ROW_H);
+
+      block.style.top = `${top}px`;
+      block.style.height = `${height}px`;
+      block.textContent = ev.title;
+
+      cell.appendChild(block);
     }
   }
 }
