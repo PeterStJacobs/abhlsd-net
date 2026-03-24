@@ -12,6 +12,8 @@
 -->
 <script defer src="https://cdn.jsdelivr.net/npm/astronomy-engine@2/astronomy.browser.min.js"></script>
 
+<script defer src="../shared/locations.js"></script>
+
 <!-- Favicons for the Mars–Venus page -->
 <link rel="icon" type="image/png" href="/assets/icons/MV-favicon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/MV-favicon-32.png">
@@ -276,6 +278,8 @@
       <div class="grid three">
         <div class="span-all">
           <label>Location preset</label>
+          <select id="preset"></select>
+          <!--
           <select id="preset">
             <option value="brisbane" selected>Brisbane, QLD, AU (-27.4698, 153.0251, 27 m)</option>
             <option value="phoenix">Phoenix, AZ, USA (33.4484, -112.0740, 331 m)</option>
@@ -285,6 +289,7 @@
             <option value="toronto">Toronto, ON, CA (43.6460, -79.3814, 76 m)</option>
             <option value="custom">Custom (use fields below)</option>
           </select>
+          -->
         </div>
 
         <div>
@@ -302,12 +307,15 @@
         <div>
           <label>Time zone (IANA)</label>
           <input id="tz" type="text" list="tzlist" placeholder="e.g., Australia/Brisbane" />
+          <datalist id="tzlist"></datalist>
+          <!--
           <datalist id="tzlist">
             <option>Australia/Brisbane</option>
             <option>America/Phoenix</option>
             <option>America/Toronto</option>
           </datalist>
         </div>
+        -->
 
         <div class="span-all">
           <div class="buttons">
@@ -445,6 +453,7 @@
   }
 
   /* ---------- Presets & observer ---------- */
+  /* 
   const PRESETS = {
     brisbane:   { lat:-27.4698,     lon: 153.0251,      elev: 27,  tz:'Australia/Brisbane' },
     phoenix:    { lat: 33.4484,     lon:-112.0740,      elev: 331, tz:'America/Phoenix' },
@@ -452,7 +461,7 @@
     waterloo:   { lat: 43.47321866, lon: -80.53587863,  elev: 329, tz:'America/Toronto' },
     scottsdale: { lat: 33.63719972, lon:-111.92482642,  elev: 390, tz:'America/Phoenix' },
     toronto:    { lat: 43.64603472, lon: -79.38138754,  elev:  76, tz:'America/Toronto' }
-  };
+  }; */
   let observer = null;
 
   function updateObserverFromInputs(){
@@ -470,6 +479,22 @@
     observerTzLabel = observerTz;
   }
 
+  function setInputsFromPreset(locationKey){
+  if(locationKey === 'custom') return;
+
+  const loc = window.ABHLSD_LOCATION_HELPERS?.getLocationByKey(locationKey);
+  if(!loc) return;
+
+  $('lat').value  = loc.latitude ?? '';
+  $('lon').value  = loc.longitude ?? '';
+  $('elev').value = Number.isFinite(loc.altitudeM) ? loc.altitudeM : '';
+  $('tz').value   = loc.timezone || '';
+
+  updateObserverFromInputs();
+  setObserverTimezoneFromInput();
+  compute();
+}
+  /*
   function setInputsFromPreset(name){
     const p = PRESETS[name]; if (!p) return;
     $('lat').value  = p.lat;
@@ -479,8 +504,47 @@
     updateObserverFromInputs();
     setObserverTimezoneFromInput();
     compute();
+  } */
+
+  /* ---------- DropDown and TZ helpers ---------- */
+  function buildPresetOptions(){
+  const select = $('preset');
+  if(!select) return;
+
+  const options = window.ABHLSD_LOCATION_HELPERS?.getLocationsFor('supportsMarsVenus') || [];
+  select.innerHTML = '';
+
+  for(const loc of options){
+    const opt = document.createElement('option');
+    opt.value = loc.key;
+
+    const elevText = Number.isFinite(loc.altitudeM) ? `${loc.altitudeM} m` : 'elev ?';
+    opt.textContent = `${loc.label} (${loc.latitude}, ${loc.longitude}, ${elevText})`;
+
+    select.appendChild(opt);
   }
 
+  const custom = document.createElement('option');
+  custom.value = 'custom';
+  custom.textContent = 'Custom (use fields below)';
+  select.appendChild(custom);
+}
+
+function buildTimezoneDatalist(){
+  const list = $('tzlist');
+  if(!list) return;
+
+  const locations = window.ABHLSD_LOCATION_HELPERS?.getLocationsFor('supportsMarsVenus') || [];
+  const zones = [...new Set(locations.map(loc => loc.timezone).filter(Boolean))];
+
+  list.innerHTML = '';
+  for(const zone of zones){
+    const opt = document.createElement('option');
+    opt.value = zone;
+    list.appendChild(opt);
+  }
+}
+  
   /* ---------- Core astronomy helpers ---------- */
   function vecToRaDec(v){
     const rxy = Math.hypot(v.x, v.y);
@@ -806,12 +870,20 @@
 
     // Defaults
     if(typeof window.Astronomy==='undefined'){ setErr('astronomy-engine library did not load.'); }
-    setInputsFromPreset('brisbane');
+    buildPresetOptions();
+    buildTimezoneDatalist();
+    setInputsFromPreset('QLD_Brisbane');
+    $('preset').value = 'QLD_Brisbane';
     setNow();
-    setLegendTime(); setLegendScatter();
+    setLegendTime();
+    setLegendScatter();
 
     // UI bindings
-    $('preset').addEventListener('change',(e)=>{const val=e.target.value;if(val==='custom')return;setInputsFromPreset(val);});
+   $('preset').addEventListener('change', (e)=>{
+      const val = e.target.value;
+      if(val === 'custom') return;
+      setInputsFromPreset(val);
+    });
     $('btn-update-observer').addEventListener('click',()=>{updateObserverFromInputs(); setObserverTimezoneFromInput(); compute();});
     $('btn-fetch-elev').addEventListener('click',()=>fetchElevationForInputs(false));
     $('btn-my-location').addEventListener('click',useCurrentLocation);
