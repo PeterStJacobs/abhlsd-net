@@ -1616,6 +1616,12 @@ function renderListView(){
       card.appendChild(lunar);
     }
 
+    const weather = buildWeatherMarkerEl(dateISO, { compact: false });
+    if(weather){
+      weather.style.marginTop = '6px';
+      card.appendChild(weather);
+    }
+
     const items = document.createElement('div');
     items.style.marginTop='8px';
     items.style.display='flex';
