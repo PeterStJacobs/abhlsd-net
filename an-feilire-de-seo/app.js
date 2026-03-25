@@ -519,6 +519,22 @@ function weatherTitleForEntry(entry){
   return bits.join(' • ');
 }
 
+function weatherSourceUrlForDisplayTZ(){
+  const loc = weatherLocationForDisplayTZ();
+  if(!loc) return '';
+
+  const params = new URLSearchParams({
+    latitude: String(loc.latitude),
+    longitude: String(loc.longitude),
+    timezone: state.displayTZ,
+    past_days: String(WEATHER.pastDays),
+    forecast_days: String(WEATHER.futureDays + 1),
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum'
+  });
+
+  return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+}
+
 async function refreshWeatherCache(force = false){
   const loc = weatherLocationForDisplayTZ();
   const window = weatherWindowForDisplayTZ();
@@ -2248,6 +2264,28 @@ function renderInspector(){
     const div = document.createElement('div');
     div.className = 'eventitem weatheritem';
 
+    const weatherUrl = weatherSourceUrlForDisplayTZ();
+
+    if(weatherUrl){
+      div.style.cursor = 'pointer';
+      div.style.userSelect = 'none';
+      div.title = 'Open weather source in a new tab';
+
+      div.addEventListener('click', ()=>{
+        window.open(weatherUrl, '_blank', 'noopener,noreferrer');
+      });
+
+      div.addEventListener('keydown', (ev)=>{
+        if(ev.key === 'Enter' || ev.key === ' '){
+          ev.preventDefault();
+          window.open(weatherUrl, '_blank', 'noopener,noreferrer');
+        }
+      });
+
+      div.tabIndex = 0;
+      div.setAttribute('role', 'link');
+    }
+
     const t = document.createElement('div');
     t.className = 'title';
     t.textContent = `${snap.weather.icon} Weather (${snap.weather.locationLabel})`;
@@ -2266,7 +2304,7 @@ function renderInspector(){
 
     const src = document.createElement('div');
     src.className = 'note';
-    src.textContent = 'Weather source: Open-Meteo';
+    src.textContent = 'Weather source: Open-Meteo ↗';
     div.appendChild(src);
 
     p.appendChild(div);
