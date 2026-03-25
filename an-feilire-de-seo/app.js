@@ -40,6 +40,28 @@ const LUNAR_PHASES = {
   }
 };
 
+const WEATHER = {
+  pastDays: 2,
+  futureDays: 4,
+  locationsByTimezone: {
+    'America/Phoenix': {
+      label: 'Phoenix, Arizona',
+      latitude: 33.4484,
+      longitude: -112.0740
+    },
+    'Australia/Brisbane': {
+      label: 'Brisbane, Queensland',
+      latitude: -27.4698,
+      longitude: 153.0251
+    },
+    'America/Toronto': {
+      label: 'Toronto, Ontario',
+      latitude: 43.6532,
+      longitude: -79.3832
+    }
+  }
+};
+
 function isFridayDateISO(dateISO){
   const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
   return dt.weekday === 5; // Luxon: Mon=1 ... Fri=5 ... Sun=7
@@ -91,6 +113,8 @@ const state = {
     overflowSlotOrder: null,
     setDaySongs: null,
     lunarPhases: null,
+    weather: null,
+    weatherPendingKey: null,
   }
 };
 
@@ -426,6 +450,243 @@ function lunarPhasesForDate(dateISO){
     buildLunarPhaseCache();
   }
   return state.data.lunarPhases?.byDate?.get(dateISO) || [];
+}
+
+/* ------------- weather functions --------------- */
+
+function weatherLocationForDisplayTZ(){
+  return WEATHER.locationsByTimezone[state.displayTZ] || null;
+}
+
+function weatherWindowForDisplayTZ(){
+  const today = DateTime.now().setZone(state.displayTZ).startOf('day');
+  return {
+    startISO: today.minus({ days: WEATHER.pastDays }).toISODate(),
+    endISO: today.plus({ days: WEATHER.futureDays }).toISODate()
+  };
+}
+
+function weatherIconForCode(code){
+  const n = Number(code);
+
+  if(n === 0) return '☀';
+  if(n === 1 || n === 2) return '⛅';
+  if(n === 3) return '☁';
+  if(n === 45 || n === 48) return '🌫';
+  if([51,53,55,56,57].includes(n)) return '🌦';
+  if([61,63,65,66,67].includes(n)) return '🌧';
+  if([71,73,75,77].includes(n)) return '❄';
+  if([80,81,82].includes(n)) return '🌦';
+  if([85,86].includes(n)) return '🌨';
+  if([95,96,99].includes(n)) return '⛈';
+
+  return '•';
+}
+
+function weatherSummaryForCode(code){
+  const n = Number(code);
+
+  if(n === 0) return 'Clear';
+  if(n === 1) return 'Mainly clear';
+  if(n === 2) return 'Partly cloudy';
+  if(n === 3) return 'Overcast';
+  if(n === 45 || n === 48) return 'Fog';
+  if([51,53,55].includes(n)) return 'Drizzle';
+  if([56,57].includes(n)) return 'Freezing drizzle';
+  if([61,63,65].includes(n)) return 'Rain';
+  if([66,67].includes(n)) return 'Freezing rain';
+  if([71,73,75,77].includes(n)) return 'Snow';
+  if([80,81,82].includes(n)) return 'Rain showers';
+  if([85,86].includes(n)) return 'Snow showers';
+  if([95,96,99].includes(n)) return 'Thunderstorm';
+
+  return 'Weather';
+}
+
+function formatWeatherTemp(v){
+  return Number.isFinite(v) ? `${Math.round(v)}°` : '—';
+}
+
+function weatherTitleForEntry(entry){
+  if(!entry) return '';
+
+  const bits = [entry.summary];
+
+  if(Number.isFinite(entry.tempMax)) bits.push(`Max ${Math.round(entry.tempMax)}°`);
+  if(Number.isFinite(entry.tempMin)) bits.push(`Min ${Math.round(entry.tempMin)}°`);
+  if(Number.isFinite(entry.precipitationSum)) bits.push(`Rain ${entry.precipitationSum} mm`);
+
+  return bits.join(' • ');
+}
+
+async function refreshWeatherCache(force = false){
+  const loc = weatherLocationForDisplayTZ();
+  const window = weatherWindowForDisplayTZ();
+
+  const unsupportedKey = `unsupported|${state.displayTZ}|${window.startISO}|${window.endISO}`;
+
+  if(!loc){
+    state.data.weather = {
+      cacheKey: unsupportedKey,
+      zone: state.displayTZ,
+      location: null,
+      startISO: window.startISO,
+      endISO: window.endISO,
+      byDate: new Map(),
+      unsupported: true,
+      error: null,
+      fetchedAt: DateTime.now().toISO()
+    };
+    return;
+  }
+
+  const cacheKey = [
+    state.displayTZ,
+    loc.latitude,
+    loc.longitude,
+    window.startISO,
+    window.endISO
+  ].join('|');
+
+  const existing = state.data.weather;
+  if(
+    !force &&
+    existing &&
+    existing.cacheKey === cacheKey &&
+    existing.byDate instanceof Map
+  ){
+    return;
+  }
+
+  state.data.weatherPendingKey = cacheKey;
+
+  try{
+    const params = new URLSearchParams({
+      latitude: String(loc.latitude),
+      longitude: String(loc.longitude),
+      timezone: state.displayTZ,
+      past_days: String(WEATHER.pastDays),
+      forecast_days: String(WEATHER.futureDays + 1),
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum'
+    });
+
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+      cache: 'no-store'
+    });
+
+    if(!res.ok){
+      throw new Error(`Weather request failed (${res.status})`);
+    }
+
+    const json = await res.json();
+
+    if(state.data.weatherPendingKey !== cacheKey) return;
+
+    const daily = json?.daily || {};
+    const dates = Array.isArray(daily.time) ? daily.time : [];
+    const byDate = new Map();
+
+    for(let i = 0; i < dates.length; i++){
+      const dateISO = dates[i];
+      const weatherCode = Number(daily.weather_code?.[i] ?? NaN);
+
+      const tempMax = Number.isFinite(Number(daily.temperature_2m_max?.[i]))
+        ? Number(daily.temperature_2m_max[i])
+        : null;
+
+      const tempMin = Number.isFinite(Number(daily.temperature_2m_min?.[i]))
+        ? Number(daily.temperature_2m_min[i])
+        : null;
+
+      const precipitationSum = Number.isFinite(Number(daily.precipitation_sum?.[i]))
+        ? Number(daily.precipitation_sum[i])
+        : null;
+
+      byDate.set(dateISO, {
+        dateISO,
+        locationLabel: loc.label,
+        weatherCode,
+        icon: weatherIconForCode(weatherCode),
+        summary: weatherSummaryForCode(weatherCode),
+        tempMax,
+        tempMin,
+        precipitationSum
+      });
+    }
+
+    state.data.weather = {
+      cacheKey,
+      zone: state.displayTZ,
+      location: loc,
+      startISO: window.startISO,
+      endISO: window.endISO,
+      byDate,
+      unsupported: false,
+      error: null,
+      fetchedAt: DateTime.now().toISO()
+    };
+  }catch(err){
+    if(state.data.weatherPendingKey !== cacheKey) return;
+
+    state.data.weather = {
+      cacheKey,
+      zone: state.displayTZ,
+      location: loc,
+      startISO: window.startISO,
+      endISO: window.endISO,
+      byDate: new Map(),
+      unsupported: false,
+      error: String(err?.message || err || 'Unknown weather error'),
+      fetchedAt: DateTime.now().toISO()
+    };
+  }
+
+  if(state.snapshot?.dateISO){
+    snapshotDay(state.snapshot.dateISO);
+  }else{
+    render();
+  }
+}
+
+function weatherForDate(dateISO){
+  const weather = state.data.weather;
+  if(!weather) return null;
+  if(weather.zone !== state.displayTZ) return null;
+  return weather.byDate?.get(dateISO) || null;
+}
+
+function buildWeatherMarkerEl(dateISO, opts = {}){
+  const entry = weatherForDate(dateISO);
+  if(!entry) return null;
+
+  const compact = opts.compact !== false;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'weather-markers';
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = 'center';
+  wrap.style.gap = '4px';
+  wrap.style.marginTop = '2px';
+  wrap.style.lineHeight = '1';
+
+  const marker = document.createElement('span');
+  marker.className = 'weather-marker';
+  marker.textContent = entry.icon;
+  marker.title = weatherTitleForEntry(entry);
+  marker.setAttribute('aria-label', weatherTitleForEntry(entry));
+  marker.style.fontSize = compact ? '12px' : '14px';
+  wrap.appendChild(marker);
+
+  if(!compact){
+    const txt = document.createElement('span');
+    txt.textContent = `${formatWeatherTemp(entry.tempMax)}/${formatWeatherTemp(entry.tempMin)}`;
+    txt.style.fontSize = '11px';
+    txt.style.color = 'var(--muted)';
+    txt.title = weatherTitleForEntry(entry);
+    wrap.appendChild(txt);
+  }
+
+  return wrap;
 }
 
 // ---------- Data: SuperMonth ranges ----------
@@ -1060,6 +1321,9 @@ function renderMonthView(){
         day.appendChild(lunar);
       }
 
+      const weather = buildWeatherMarkerEl(dateISO, { compact: true });
+      if(weather) day.appendChild(weather);
+
       const timed = (oneOffByDay.get(dateISO) || []).filter(ev => !isMultiDayOneOff(ev));
       const MAX_TIMED_VISIBLE = 2;
 
@@ -1156,6 +1420,9 @@ function renderWeekView(){
 
     const lunar = buildLunarMarkersEl(dateISO);
     if(lunar) cell.appendChild(lunar);
+
+    const weather = buildWeatherMarkerEl(dateISO, { compact: true });
+    if(weather) cell.appendChild(weather);
 
     cell.addEventListener('mouseenter', ()=>{
       if(window.matchMedia('(max-width: 1040px)').matches) return;
@@ -1825,6 +2092,7 @@ function snapshotDay(dateISO){
   const songSlots = seoianSongSlotsForDate(dateISO);
   const fridayFlower = fridayFlowerForDate(dateISO);
   const lunarPhases = lunarPhasesForDate(dateISO);
+  const weather = weatherForDate(dateISO);
 
   const periods = state.filters.superMonths
     ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
@@ -1849,6 +2117,7 @@ function snapshotDay(dateISO){
     overflowSongs,
     fridayFlower,
     lunarPhases,
+    weather,
     songSlots,
     periods,
     facts: superDayFactsForDate(dateISO, state.tamaraTZ, state.martinTZ),
@@ -1946,8 +2215,6 @@ function renderInspector(){
     }
   }
 
-
-
   if(snap.lunarPhases && snap.lunarPhases.length){
     any = true;
 
@@ -1968,7 +2235,31 @@ function renderInspector(){
       p.appendChild(div);
     }
   }
+  
+  if(snap.weather){
+    any = true;
 
+    const div = document.createElement('div');
+    div.className = 'eventitem weatheritem';
+
+    const t = document.createElement('div');
+    t.className = 'title';
+    t.textContent = `${snap.weather.icon} Weather (${snap.weather.locationLabel})`;
+    div.appendChild(t);
+
+    const n = document.createElement('div');
+    n.className = 'note';
+
+    const bits = [snap.weather.summary];
+    if(Number.isFinite(snap.weather.tempMax)) bits.push(`Max ${Math.round(snap.weather.tempMax)}°`);
+    if(Number.isFinite(snap.weather.tempMin)) bits.push(`Min ${Math.round(snap.weather.tempMin)}°`);
+    if(Number.isFinite(snap.weather.precipitationSum)) bits.push(`Rain ${snap.weather.precipitationSum} mm`);
+
+    n.textContent = bits.join(' • ');
+    div.appendChild(n);
+
+    p.appendChild(div);
+  }
   if(snap.silentSong){
     any = true;
 
@@ -2659,6 +2950,8 @@ function bindControls(){
     }else{
       render();
     }
+
+    refreshWeatherCache();
   });
 
   el('btnFilters').addEventListener('click', ()=>{
@@ -2971,6 +3264,7 @@ async function loadData(){
   setUpTZList();
   bindControls();
   await loadData();
+  await refreshWeatherCache();
   ensureEastWestOrder();
   mountClocks();
   snapshotDay(DateTime.now().setZone(state.displayTZ).toISODate());
