@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mars–Venus: Angle, Distance, Sky Path + Exports</title>
+<style>
+  :root { --bg:#0b1020; --panel:#171c2e; --text:#e8ecff; --muted:#9aa3c7; --accent:#7aa2ff; --border:#2b3252; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+  h1{margin:0 0 8px;font-size:clamp(24px,3.6vw,36px)}
+  p.lead{color:var(--muted);margin:0 0 16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+
+  .grid{display:grid;gap:16px;grid-template-columns:1fr}
+  @media (min-width:900px){
+    .grid.two   { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+    .grid.three { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
+  }
+  .span-all { grid-column: 1 / -1; }
+
+  label{display:block;font-weight:600;margin-bottom:6px}
+  input[type="datetime-local"],input[type="number"],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0f1426;color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .buttons{display:flex;gap:10px;flex-wrap:wrap}
+  button{background:var(--accent);color:#0a0f1e;font-weight:700;border:none;padding:10px 14px;border-radius:12px;cursor:pointer}
+  button.secondary{background:#2b3252;color:var(--text)}
+  .results{display:grid;grid-template-columns:1fr;gap:12px}
+  @media (min-width:700px){.results{grid-template-columns:1fr 1fr}}
+  .tile{background:#10162a;border:1px solid var(--border);border-radius:12px;padding:14px}
+  .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+  .v{font-size:clamp(18px,3vw,28px);font-variant-numeric:tabular-nums}
+  .sub{color:var(--muted);margin-top:6px;font-size:14px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;white-space:pre-wrap}
+  .error{color:#ffb3b3;margin-top:8px}
+  canvas{width:100%;height:260px;background:#0f1426;border:1px solid var(--border);border-radius:12px;display:block}
+  .small{font-size:12px;color:var(--muted)}
+  .checkrow{display:flex;gap:10px;align-items:center;margin-top:8px}
+
+  #dt { max-width: 380px; }
+
+  .tip{position:relative;display:inline-flex;align-items:center}
+  .tip-btn{background:#2b3252;border:1px solid var(--border);color:#e8ecff;width:18px;height:18px;border-radius:50%;
+           font-size:12px;line-height:16px;text-align:center;cursor:help;user-select:none}
+  .tip-content{position:absolute;left:26px;top:-2px;display:none;width:320px;background:#10162a;border:1px solid var(--border);
+               color:var(--text);padding:10px 12px;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.4);z-index:20}
+  .tip:focus-within .tip-content, .tip:hover .tip-content{display:block}
+  .tip-content p{margin:0 0 6px 0;font-size:13px;color:#cbd3f5}
+  .tip-content ul{margin:0 0 0 18px;padding:0;font-size:13px;color:#cbd3f5}
+  .tip-content li{margin:2px 0}
+
+  /* Legend colours for angle + current time */
+  .legend .min { color:#3bd16f; font-weight:600; }   /* angle min (bright green) */
+  .legend .max { color:#ff7272; font-weight:600; }   /* angle max (bright red)   */
+  .legend .now { color:#6aa7ff; font-weight:600; }   /* Current Time (blue)      */
+
+  /* Distance legend colours (global classes) */
+  .min-dist { color:#1e8f5a; font-weight:600; }      /* distance min (dark green) */
+  .max-dist { color:#b22222; font-weight:600; }      /* distance max (dark red)   */
+
+  /* Scan text colours */
+  .min-line { color:#3bd16f; font-weight:600; }
+  .max-line { color:#ff7272; font-weight:600; }
+  .min-dist-line { color:#1e8f5a; font-weight:600; }
+  .max-dist-line { color:#b22222; font-weight:600; }
+
+  /* Back button */
+  .topbar { display:flex; align-items:center; margin-bottom:8px; }
+  .back {
+    background:#2b3252;
+    color:var(--text);
+    font-weight:700;
+    padding:8px 12px;
+    border-radius:10px;
+    text-decoration:none;
+    border:1px solid var(--border);
+    display:inline-flex; gap:6px; align-items:center;
+  }
+  .back:hover { filter:brightness(1.05); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a id="back" class="back" href="../ABHLSD.html" aria-label="Back to ABHLSD">← Back to ABHLSD</a>
+    </div>
+
+    <h1>Mars–Venus: Angular Separation & Planet–Planet Distance</h1>
+    <p class="lead">Local calculations via astronomy-engine. Presets for Brisbane, Phoenix, Kincardine, Waterloo, Scottsdale, Toronto. Toggle topocentric angle for location-dependent separation. Sky path shows topocentric Alt/Az.</p>
+
+    <div class="card">
+      <div class="grid two">
+        <div>
+          <label for="dt">Date & time (local)</label>
+          <input id="dt" type="datetime-local" />
+          <div class="buttons" style="margin-top:10px;">
+            <button id="btn-now" type="button">Use current time</button>
+            <button id="btn-calc" type="button">Calculate</button>
+          </div>
+
+          <div class="checkrow">
+            <input id="chk-topo" type="checkbox" />
+            <label for="chk-topo" style="margin:0;">Use topocentric angle (location-dependent)</label>
+            <span class="tip">
+              <button class="tip-btn" aria-label="What does topocentric mean?" aria-describedby="tip-topo">?</button>
+              <div id="tip-topo" role="tooltip" class="tip-content">
+                <p><strong>Geocentric</strong> angle: computed from Earth’s center (default). Same for all locations.</p>
+                <p><strong>Topocentric</strong> angle: computed from your location (includes parallax). Can differ slightly by site.</p>
+                <ul>
+                  <li>Effect size (planets): usually a few to a few tens of arcseconds (~0.01 deg).</li>
+                  <li>Plots, scan and CSV use whichever mode is selected.</li>
+                  <li><strong>Sky path</strong> is always topocentric Alt/Az.</li>
+                </ul>
+              </div>
+            </span>
+          </div>
+
+          <!-- Timezone toggle -->
+          <div class="checkrow">
+            <input id="chk-use-obs-tz" type="checkbox" checked />
+            <label for="chk-use-obs-tz" style="margin:0;">Use observer timezone for time charts (otherwise UTC)</label>
+          </div>
+
+          <!-- Options for Angle–Distance chart -->
+          <div class="checkrow">
+            <input id="chk-time-arrows" type="checkbox" />
+            <label for="chk-time-arrows" style="margin:0;">Show time arrows on Angle–Distance plot</label>
+          </div>
+          <div class="checkrow">
+            <input id="chk-time-gradient" type="checkbox" />
+            <label for="chk-time-gradient" style="margin:0;">Color Angle–Distance path by time (early→late)</label>
+          </div>
+
+          <div id="err" class="error" role="alert" aria-live="polite"></div>
+          <p class="small">Angle uses geocentric (checkbox off) or topocentric (checkbox on). Distance is heliocentric. Alt/Az is always topocentric.</p>
+        </div>
+        <div>
+          <div class="results">
+            <div class="tile">
+              <div class="k">Angular separation</div>
+              <div class="v" id="angle">—</div>
+              <div class="sub mono" id="angle-sub">—</div>
+            </div>
+            <div class="tile">
+              <div class="k">Planet–planet distance</div>
+              <div class="v" id="dist-au">—</div>
+              <div class="sub mono" id="dist-km">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Planet readouts -->
+    <div class="grid two" style="margin-top:16px;">
+      <div class="card">
+        <div class="k">Mars (geocentric apparent)</div>
+        <div class="v mono" id="mars-radec">—</div>
+        <div class="sub mono" id="mars-xyz">—</div>
+        <div class="sub mono" id="mars-horiz">—</div>
+      </div>
+      <div class="card">
+        <div class="k">Venus (geocentric apparent)</div>
+        <div class="v mono" id="venus-radec">—</div>
+        <div class="sub mono" id="venus-xyz">—</div>
+        <div class="sub mono" id="venus-horiz">—</div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="card" style="margin-top:16px;">
+      <div class="grid three">
+        <div class="span-all">
+          <label>Location preset</label>
+          <select id="preset">
+            <option value="brisbane" selected>Brisbane, QLD, AU (-27.4698, 153.0251, 50 m)</option>
+            <option value="phoenix">Phoenix, AZ, USA (33.4484, -112.0740, 331 m)</option>
+            <option value="kincardine">Kincardine, ON, CA (44.1838, -81.6384, auto)</option>
+            <option value="waterloo">Waterloo, ON, CA (43.4732, -80.5359, auto)</option>
+            <option value="scottsdale">Scottsdale, AZ, USA (33.6372, -111.9248, auto)</option>
+            <option value="toronto">Toronto, ON, CA (43.6460, -79.3814, auto)</option>
+            <option value="custom">Custom (use fields below)</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Observer latitude (deg)</label>
+          <input id="lat" type="number" step="0.0001" value="-27.4698" />
+        </div>
+        <div>
+          <label>Observer longitude (deg)</label>
+          <input id="lon" type="number" step="0.0001" value="153.0251" />
+        </div>
+        <div>
+          <label>Elevation (m)</label>
+          <input id="elev" type="number" step="1" value="50" />
+        </div>
+
+        <div class="span-all">
+          <div class="buttons">
+            <button id="btn-update-observer" class="secondary" type="button">Update observer</button>
+            <button id="btn-fetch-elev" class="secondary" type="button" title="Lookup elevation by lat/lon">Fetch elevation</button>
+            <button id="btn-my-location" class="secondary" type="button" title="Use device GPS">Use current location</button>
+          </div>
+        </div>
+      </div>
+      <p class="small">Presets marked "auto" fetch elevation from Open-Meteo. "Use current location" asks your browser for GPS, then fetches elevation too.</p>
+    </div>
+
+    <!-- SCAN / PLOT -->
+    <div class="card" style="margin-top:16px;">
+      <div class="row" style="gap:16px;">
+        <div>
+          <label>Scan window (days, +/- around selected time)</label>
+          <input id="scan-days" type="number" step="1" value="30" />
+        </div>
+        <div>
+          <label>Step size (hours)</label>
+          <input id="scan-step" type="number" step="1" value="6" />
+        </div>
+        <div>
+          <label>Sky path span (hours)</label>
+          <input id="sky-hours" type="number" step="1" value="12" />
+        </div>
+        <div>
+          <label>Sky path step (minutes)</label>
+          <input id="sky-step" type="number" step="1" value="10" />
+        </div>
+        <div class="buttons" style="align-self:flex-end;">
+          <button id="btn-scan" type="button">Find closest & greatest</button>
+          <button id="btn-plot" class="secondary" type="button">Plot angle, distance & sky</button>
+          <button id="btn-download-csv" class="secondary" type="button">Download CSV</button>
+          <button id="btn-save-png" class="secondary" type="button">Save charts as PNG</button>
+        </div>
+      </div>
+
+      <div id="scan-results" class="mono" style="margin-top:10px;">—</div>
+
+      <div class="grid two" style="margin-top:12px;">
+        <div>
+          <div class="k" style="margin-bottom:6px;">Angular separation (deg) vs time</div>
+          <canvas id="chart-angle" width="500" height="260"></canvas>
+        </div>
+        <div>
+          <div class="k" style="margin-bottom:6px;">Distance (AU) vs time</div>
+          <canvas id="chart-dist" width="500" height="260"></canvas>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="k" style="margin-bottom:6px;">Angle (deg) vs Distance (AU)</div>
+        <canvas id="chart-angle-dist" width="1024" height="260"></canvas>
+      </div>
+
+      <!-- NEW: Sky path chart -->
+      <div style="margin-top:12px;">
+        <div class="k" style="margin-bottom:6px;">Sky path (Altitude vs Azimuth)</div>
+        <canvas id="chart-sky" width="1024" height="260"></canvas>
+        <div class="small" style="text-align:center;margin-top:6px;">
+          <span style="color:#ff9b42;font-weight:700;">Mars path</span> &nbsp;|&nbsp;
+          <span style="color:#ffd166;font-weight:700;">Venus path</span> &nbsp;|&nbsp;
+          Azimuth 0°/360° = North, 90° = East, 180° = South, 270° = West. Horizon = 0° line.
+        </div>
+      </div>
+
+      <div class="legend legend-below" id="legend-below" style="text-align:center; margin-top:6px;">
+        <!-- set dynamically -->
+      </div>
+    </div>
+
+    <p class="small" style="margin-top:16px;">To publish, upload this file and <code>astronomy.browser.min.js</code> to your hosting.</p>
+  </div>
+
+  <script src="./astronomy.browser.min.js"></script>
+
+  <script>
+  (function(){
+    const $ = (id) => document.getElementById(id);
+    const setErr = (msg) => { $('err').textContent = msg || ''; };
+    const AU_KM = 149597870.7;
+
+    /* Marker colours */
+    const CLR_MIN = '#3bd16f';     // angle min (bright green)
+    const CLR_MAX = '#ff7272';     // angle max (bright red)
+    const CLR_NOW = '#6aa7ff';     // current time (blue)
+
+    const CLR_MIN_DIST = '#1e8f5a'; // distance min (dark green)
+    const CLR_MAX_DIST = '#b22222'; // distance max (dark red)
+
+    // Time gradient (early → late) for the angle–distance scatter
+    const CLR_TIME_EARLY = '#6aa7ff';
+    const CLR_TIME_LATE  = '#ff86c8';
+
+    // Sky path colors
+    const CLR_MARS  = '#ff9b42';  // orange
+    const CLR_VENUS = '#ffd166';  // gold
+
+    function setLegend(){
+      $('legend-below').innerHTML =
+        'Angle: <span class="min">Min</span>, <span class="max">Max</span> &nbsp;|&nbsp; ' +
+        'Distance: <span class="min-dist">Min</span>, <span class="max-dist">Max</span> &nbsp;|&nbsp; ' +
+        '<span class="now">Current Time</span>';
+    }
+
+    // Observer TZ (IANA) from lat/lon; fallback to browser
+    let observerTz = null;
+    let observerTzLabel = '';
+
+    function tickPartsInZone(ms, tz){
+      const d = new Date(ms);
+      const fmt = new Intl.DateTimeFormat(undefined, {
+        timeZone: tz, year:'2-digit', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', hour12:false
+      });
+      const parts = fmt.formatToParts(d);
+      const get = (t) => (parts.find(p=>p.type===t)||{}).value || '';
+      return [`${get('year')}-${get('month')}-${get('day')}`, `${get('hour')}:${get('minute')}`];
+    }
+    function useObserverTz(){ return $('chk-use-obs-tz')?.checked; }
+    function tickPartsForMode(ms){
+      const tz = useObserverTz() ? (observerTz || Intl.DateTimeFormat().resolvedOptions().timeZone) : 'UTC';
+      return tickPartsInZone(ms, tz);
+    }
+
+    const pad=(n,w=2)=>String(n).padStart(w,'0');
+    const fmtRA = (hours)=>{ const s=hours*3600, h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60; return pad(h)+'h '+pad(m)+'m '+sec.toFixed(2)+'s'; };
+    const fmtDec = (deg)=>{ const sign=deg<0?'-':'+'; const d=Math.abs(deg), D=Math.floor(d), M=Math.floor((d-D)*60), S=(d-D-M/60)*3600; return sign+pad(D)+' deg '+pad(M)+' min '+S.toFixed(1)+' sec'; };
+    const fmtAngleDMS = (deg)=>{ const d=Math.abs(deg), D=Math.floor(d), M=Math.floor((d-D)*60), S=(d-D-M/60)*3600; return D+' deg '+M+' min '+S.toFixed(1)+' sec'; };
+    const fmtAU = (au)=> au.toLocaleString(undefined,{minimumFractionDigits:6,maximumFractionDigits:6})+' AU';
+    const fmtKM = (km)=> km.toLocaleString(undefined,{maximumFractionDigits:0})+' km';
+
+    const PRESETS = {
+      brisbane:   { lat:-27.4698,     lon: 153.0251,      elev: 50  },
+      phoenix:    { lat: 33.4484,     lon:-112.0740,      elev: 331 },
+      kincardine: { lat: 44.1838078,  lon: -81.6384156,   elev: 'auto' },
+      waterloo:   { lat: 43.47321866, lon: -80.53587863,  elev: 'auto' },
+      scottsdale: { lat: 33.63719972, lon:-111.92482642,  elev: 'auto' },
+      toronto:    { lat: 43.64603472, lon: -79.38138754,  elev: 'auto' }
+    };
+
+    let observer = null;
+
+    function updateObserverFromInputs(){
+      try {
+        const lat  = parseFloat($('lat').value);
+        const lon  = parseFloat($('lon').value);
+        let elev = parseFloat($('elev').value);
+        if (!Number.isFinite(elev)) elev = 0;
+        observer = new Astronomy.Observer(lat, lon, elev);
+      } catch(e){ setErr('Invalid observer values: ' + e.message); }
+    }
+
+    async function fetchTimezoneForInputs(silent=true){
+      const lat = parseFloat($('lat').value);
+      const lon = parseFloat($('lon').value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+        if (!silent) setErr('Enter valid latitude and longitude for timezone lookup.');
+        return;
+      }
+      try{
+        const url = 'https://api.geotimezone.com/public/timezone?latitude='+encodeURIComponent(lat)+'&longitude='+encodeURIComponent(lon);
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        if (data && data.iana_timezone){
+          observerTz = data.iana_timezone;
+          observerTzLabel = observerTz;
+        } else {
+          throw new Error('No IANA timezone in response');
+        }
+      } catch(e){
+        observerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        observerTzLabel = observerTz + ' (browser fallback)';
+        if (!silent) setErr('Timezone lookup failed; using browser timezone.');
+      }
+    }
+
+    function setInputsFromPreset(name){
+      const p = PRESETS[name]; if (!p) return;
+      $('lat').value  = p.lat;
+      $('lon').value  = p.lon;
+      if (p.elev === 'auto'){
+        $('elev').value = '';
+        fetchElevationForInputs(true);
+      } else {
+        $('elev').value = p.elev;
+      }
+      updateObserverFromInputs();
+      fetchTimezoneForInputs(true);
+      compute();
+    }
+
+    function vecToRaDec(v){
+      const rxy = Math.hypot(v.x, v.y);
+      let ra = Math.atan2(v.y, v.x); if (ra < 0) ra += 2*Math.PI;
+      const dec = Math.atan2(v.z, rxy);
+      return { raHours: ra * 12/Math.PI, decDeg: dec * 180/Math.PI };
+    }
+
+    function angleFromRaDec(ra1h, dec1d, ra2h, dec2d){
+      const ra1 = ra1h * Math.PI/12;
+      const ra2 = ra2h * Math.PI/12;
+      const d1  = dec1d * Math.PI/180;
+      const d2  = dec2d * Math.PI/180;
+      const x1 = Math.cos(d1)*Math.cos(ra1), y1 = Math.cos(d1)*Math.sin(ra1), z1 = Math.sin(d1);
+      const x2 = Math.cos(d2)*Math.cos(ra2), y2 = Math.cos(d2)*Math.sin(ra2), z2 = Math.sin(d2);
+      const dot = Math.max(-1, Math.min(1, x1*x2 + y1*y2 + z1*z2));
+      return Math.acos(dot) * 180/Math.PI;
+    }
+
+    function angleAtTime(t, useTopocentric){
+      const A = window.Astronomy;
+      if (!useTopocentric){
+        const gvM = A.GeoVector(A.Body.Mars,  t, true);
+        const gvV = A.GeoVector(A.Body.Venus, t, true);
+        return A.AngleBetween(gvM, gvV);
+      } else {
+        const eqM = A.Equator(A.Body.Mars,  t, observer, true, true);
+        const eqV = A.Equator(A.Body.Venus, t, observer, true, true);
+        return angleFromRaDec(eqM.ra, eqM.dec, eqV.ra, eqV.dec);
+      }
+    }
+
+    function distanceAtTime(t){
+      const A = window.Astronomy;
+      const hvM = A.HelioVector(A.Body.Mars,  t);
+      const hvV = A.HelioVector(A.Body.Venus, t);
+      return Math.hypot(hvM.x-hvV.x, hvM.y-hvV.y, hvM.z-hvV.z);
+    }
+
+    function compute(){
+      setErr('');
+      if (typeof window.Astronomy === 'undefined'){ setErr('astronomy.browser.min.js did not load.'); return; }
+      const A = window.Astronomy;
+      if (!observer) updateObserverFromInputs();
+
+      const useTopo = $('chk-topo').checked;
+      const dtInput = $('dt').value;
+      const date = dtInput ? new Date(dtInput) : new Date();
+      const t = new A.AstroTime(date);
+
+      const angDeg = angleAtTime(t, useTopo);
+
+      const gvM = A.GeoVector(A.Body.Mars,  t, true);
+      const gvV = A.GeoVector(A.Body.Venus, t, true);
+      const m = vecToRaDec(gvM);
+      const v = vecToRaDec(gvV);
+
+      const dAU = distanceAtTime(t);
+      const dKM = dAU * AU_KM;
+
+      let horM = null, horV = null;
+      try {
+        // Topocentric equatorial for each body…
+        const eqMars  = A.Equator(A.Body.Mars,  t, observer, true, true);
+        const eqVenus = A.Equator(A.Body.Venus, t, observer, true, true);
+        // …then convert to horizontal (Alt/Az)
+        horM = A.Horizon(t, observer, eqMars.ra,  eqMars.dec,  'normal');
+        horV = A.Horizon(t, observer, eqVenus.ra, eqVenus.dec, 'normal');
+      } catch(e){}
+
+      $('angle').textContent     = fmtAngleDMS(angDeg);
+      $('angle-sub').textContent = angDeg.toFixed(6) + ' deg (' + (useTopo ? 'topocentric' : 'geocentric') + ')';
+      $('dist-au').textContent   = fmtAU(dAU);
+      $('dist-km').textContent   = fmtKM(dKM);
+      $('mars-radec').textContent  = 'RA ' + fmtRA(m.raHours) + ',  Dec ' + fmtDec(m.decDeg);
+      $('venus-radec').textContent = 'RA ' + fmtRA(v.raHours) + ', Dec ' + fmtDec(v.decDeg);
+
+      const hvM = A.HelioVector(A.Body.Mars,  t);
+      const hvV = A.HelioVector(A.Body.Venus, t);
+      $('mars-xyz').textContent  = 'Heliocentric: x=' + hvM.x.toFixed(6) + ', y=' + hvM.y.toFixed(6) + ', z=' + hvM.z.toFixed(6) + ' AU';
+      $('venus-xyz').textContent = 'Heliocentric: x=' + hvV.x.toFixed(6) + ', y=' + hvV.y.toFixed(6) + ', z=' + hvV.z.toFixed(6) + ' AU';
+
+      $('mars-horiz').textContent  = horM ? ('Topocentric Alt=' + horM.altitude.toFixed(1) + ' deg, Az=' + horM.azimuth.toFixed(1) + ' deg') : 'Topocentric Alt/Az unavailable.';
+      $('venus-horiz').textContent = horV ? ('Topocentric Alt=' + horV.altitude.toFixed(1) + ' deg, Az=' + horV.azimuth.toFixed(1) + ' deg') : 'Topocentric Alt/Az unavailable.';
+    }
+
+    async function scanExtrema(centerDate, days, stepHours, useTopo){
+      const A = window.Astronomy;
+      let bestMinA = { t:null, val: Infinity }, bestMaxA = { t:null, val: -Infinity };
+      let bestMinD = { t:null, val: Infinity }, bestMaxD = { t:null, val: -Infinity };
+
+      for (let h=-days*24; h<=days*24; h+=stepHours){
+        const t = new A.AstroTime(new Date(centerDate.getTime()+h*3600*1000));
+        const a = angleAtTime(t, useTopo);
+        const d = distanceAtTime(t);
+        if (a < bestMinA.val) bestMinA = { t, val:a };
+        if (a > bestMaxA.val) bestMaxA = { t, val:a };
+        if (d < bestMinD.val) bestMinD = { t, val:d };
+        if (d > bestMaxD.val) bestMaxD = { t, val:d };
+      }
+
+      async function refine(t0, mode, f){
+        let center = t0.date.getTime();
+        const steps = [3600e3, 600e3, 60e3, 10e3];
+        for (const step of steps){
+          let best = { t:center, val: (mode==='min'? Infinity : -Infinity) };
+          for (let k=-5; k<=5; k++){
+            const tt = center + k*step;
+            const val = f(new A.AstroTime(new Date(tt)));
+            if ((mode==='min' && val < best.val) || (mode==='max' && val > best.val)){
+              best = { t: tt, val };
+            }
+          }
+          center = best.t;
+        }
+        return new A.AstroTime(new Date(center));
+      }
+
+      const minAT = await refine(bestMinA.t, 'min', (tt)=>angleAtTime(tt, useTopo));
+      const maxAT = await refine(bestMaxA.t, 'max', (tt)=>angleAtTime(tt, useTopo));
+      const minDT = await refine(bestMinD.t, 'min', (tt)=>distanceAtTime(tt));
+      const maxDT = await refine(bestMaxD.t, 'max', (tt)=>distanceAtTime(tt));
+
+      return {
+        minAngle:    { time: minAT.date.toISOString(), deg: angleAtTime(minAT, useTopo) },
+        maxAngle:    { time: maxAT.date.toISOString(), deg: angleAtTime(maxAT, useTopo) },
+        minDistance: { time: minDT.date.toISOString(), au: distanceAtTime(minDT), km: distanceAtTime(minDT)*AU_KM },
+        maxDistance: { time: maxDT.date.toISOString(), au: distanceAtTime(maxDT), km: distanceAtTime(maxDT)*AU_KM }
+      };
+    }
+
+    function collectSeries(centerDate, days, stepHours, useTopo){
+      const A = window.Astronomy;
+      const xs=[], angle=[], dist=[];
+      for (let h=-days*24; h<=days*24; h+=stepHours){
+        const d = new Date(centerDate.getTime()+h*3600*1000);
+        const t = new A.AstroTime(d);
+        xs.push(d.getTime());
+        angle.push(angleAtTime(t, useTopo));
+        dist.push(distanceAtTime(t));
+      }
+      return { xs, angle, dist };
+    }
+
+    /* ---------- Time charts (angle/time, distance/time) ---------- */
+    function plotSeries(canvas, xs, ys, yLabel, markers){
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+
+      const P_LEFT = 48, P_RIGHT = 16, P_TOP = 20, P_BOTTOM = 72;
+      const x0 = P_LEFT, y0 = H - P_BOTTOM, x1 = W - P_RIGHT, y1 = P_TOP;
+
+      ctx.strokeStyle = '#3a4367'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+
+      ctx.fillStyle = '#9aa3c7'; ctx.font = '12px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+      ctx.fillText(yLabel, x0, y1 - 6);
+
+      const xmin = Math.min(...xs), xmax = Math.max(...xs);
+      const ymin = Math.min(...ys), ymax = Math.max(...ys);
+      const xr = xmax - xmin || 1,  yr = ymax - ymin || 1;
+      const xmap = (x) => x0 + (x - xmin)/xr * (x1 - x0);
+      const ymap = (y) => y0 - (y - ymin)/yr * (y0 - y1);
+
+      ctx.strokeStyle = '#25304f'; ctx.setLineDash([3,3]);
+      for (let i=1;i<=4;i++){
+        const yy = y0 - i*(y0 - y1)/5;
+        ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = '#7aa2ff'; ctx.lineWidth = 2; ctx.beginPath();
+      ys.forEach((y,i)=>{ const xx=xmap(xs[i]), yy=ymap(y); if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); });
+      ctx.stroke();
+
+      if (markers && markers.length){
+        markers.forEach(m=>{
+          if (m.t < xmin || m.t > xmax) return;
+          const xx = xmap(m.t);
+          ctx.save();
+          ctx.strokeStyle = m.color;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      const px = x1 - x0;
+      const tickCount = Math.min(10, Math.max(4, Math.floor(px / 110)));
+      ctx.fillStyle = '#9aa3c7';
+      ctx.font = '12px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+
+      for (let i=0;i<=tickCount;i++){
+        const t = xmin + i*(xr/tickCount);
+        const xx = xmap(t);
+        ctx.strokeStyle = '#3a4367'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y0+4); ctx.stroke();
+
+        const parts = tickPartsForMode(t);
+        ctx.save();
+        ctx.translate(xx, y0 + 6);
+        ctx.rotate(-Math.PI/6);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText(parts[0], 0, 0);
+        ctx.fillText(parts[1], 0, 14);
+        ctx.restore();
+      }
+
+      ctx.fillText(ymin.toFixed(3), x1 - 60, y0 + 16);
+      ctx.fillText(ymax.toFixed(3), x1 - 60, y1 - 4);
+    }
+
+    /* ---------- Angle vs Distance scatter (with optional gradient & arrows) ---------- */
+    function hexToRgb(hex){
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return m ? { r:parseInt(m[1],16), g:parseInt(m[2],16), b:parseInt(m[3],16) } : {r:122,g:162,b:255};
+    }
+    function rgbToHex(r,g,b){
+      return '#' + [r,g,b].map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+    }
+    function blend(c1, c2, t){
+      const a = hexToRgb(c1), b = hexToRgb(c2);
+      return rgbToHex(a.r + (b.r-a.r)*t, a.g + (b.g-a.g)*t, a.b + (b.b-a.b)*t);
+    }
+    function drawArrowhead(ctx, x, y, angleRad, size, color){
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angleRad);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-size,  size*0.6);
+      ctx.lineTo(-size, -size*0.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function plotAngleVsDistance(canvas, dists, angles, markersPts, opts){
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+
+      const P_LEFT = 64, P_RIGHT = 16, P_TOP = 20, P_BOTTOM = 50;
+      const x0 = P_LEFT, y0 = H - P_BOTTOM, x1 = W - P_RIGHT, y1 = P_TOP;
+
+      // Axes
+      ctx.strokeStyle = '#3a4367'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+
+      // Labels
+      ctx.fillStyle = '#9aa3c7'; ctx.font = '12px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+      ctx.fillText('Distance (AU)', (x0+x1)/2 - 40, y0 + 32);
+      ctx.save(); ctx.translate(x0 - 42, (y0+y1)/2 + 24); ctx.rotate(-Math.PI/2);
+      ctx.fillText('Angle (deg)', 0, 0); ctx.restore();
+
+      const xmin = Math.min(...dists), xmax = Math.max(...dists);
+      const ymin = Math.min(...angles), ymax = Math.max(...angles);
+      const xr = (xmax - xmin) || 1,  yr = (ymax - ymin) || 1;
+
+      // Padding
+      const padX = xr*0.04, padY = yr*0.08;
+      const minX = xmin - padX, maxX = xmax + padX;
+      const minY = ymin - padY, maxY = ymax + padY;
+
+      const xmap = (x) => x0 + (x - minX)/(maxX - minX) * (x1 - x0);
+      const ymap = (y) => y0 - (y - minY)/(maxY - minY) * (y0 - y1);
+
+      // Grid
+      ctx.strokeStyle = '#25304f'; ctx.setLineDash([3,3]);
+      for (let i=1;i<=4;i++){
+        const yy = y0 - i*(y0 - y1)/5;
+        ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+      }
+      for (let i=1;i<=4;i++){
+        const xx = x0 + i*(x1 - x0)/5;
+        ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      const useGradient = !!(opts && opts.gradient);
+      const showArrows  = !!(opts && opts.arrows);
+
+      // Path (optionally gradient)
+      if (!useGradient){
+        ctx.strokeStyle = '#7aa2ff'; ctx.lineWidth = 2; ctx.beginPath();
+        for (let i=0;i<dists.length;i++){
+          const xx = xmap(dists[i]), yy = ymap(angles[i]);
+          if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
+        }
+        ctx.stroke();
+      } else {
+        ctx.lineWidth = 2;
+        for (let i=1;i<dists.length;i++){
+          const t = i / (dists.length - 1);
+          ctx.strokeStyle = blend(CLR_TIME_EARLY, CLR_TIME_LATE, t);
+          ctx.beginPath();
+          ctx.moveTo(xmap(dists[i-1]), ymap(angles[i-1]));
+          ctx.lineTo(xmap(dists[i]),   ymap(angles[i]));
+          ctx.stroke();
+        }
+      }
+
+      // Points (subtle)
+      ctx.fillStyle = useGradient ? '#e8ecff33' : '#7aa2ff';
+      for (let i=0;i<dists.length;i++){
+        const xx = xmap(dists[i]), yy = ymap(angles[i]);
+        ctx.beginPath(); ctx.arc(xx, yy, 2, 0, Math.PI*2); ctx.fill();
+      }
+
+      // Time arrows
+      if (showArrows && dists.length > 1){
+        const approxSpacingPx = 120;
+        let acc = 0;
+        for (let i=1;i<dists.length;i++){
+          const xA = xmap(dists[i-1]), yA = ymap(angles[i-1]);
+          const xB = xmap(dists[i]),   yB = ymap(angles[i]);
+          const dx = xB - xA, dy = yB - yA;
+          const segLen = Math.hypot(dx, dy);
+          acc += segLen;
+          if (acc >= approxSpacingPx){
+            acc = 0;
+            const ang = Math.atan2(dy, dx);
+            const col = useGradient ? blend(CLR_TIME_EARLY, CLR_TIME_LATE, i/(dists.length-1)) : '#7aa2ff';
+            drawArrowhead(ctx, xB, yB, ang, 8, col);
+          }
+        }
+      }
+
+      // Marker points (min/max angle & distance)
+      if (markersPts && markersPts.length){
+        markersPts.forEach(m=>{
+          const xx = xmap(m.x), yy = ymap(m.y);
+          ctx.save();
+          ctx.lineWidth = 2; ctx.strokeStyle = m.color; ctx.fillStyle = m.color;
+          ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      // Axis min/max labels
+      ctx.fillStyle = '#9aa3c7';
+      ctx.fillText(minX.toFixed(3), x0, y0 + 16);
+      ctx.fillText(maxX.toFixed(3), x1 - 50, y0 + 16);
+      ctx.fillText(minY.toFixed(3), x1 - 60, y0 + 16);
+      ctx.fillText(maxY.toFixed(3), x1 - 60, y1 - 4);
+    }
+
+    /* ---------- Sky path (Alt vs Az) ---------- */
+    function collectSkyPath(centerDate, hours, stepMin){
+      const A = window.Astronomy;
+
+      // Make sure we have an observer
+      if (!observer) updateObserverFromInputs();
+
+      const half = Math.max(1, hours) * 3600e3 / 2;
+      const start = centerDate.getTime() - half;
+      const end   = centerDate.getTime() + half;
+      const step  = Math.max(1, stepMin) * 60e3;
+
+      const mars = [], venus = [];
+
+      for (let ms = start; ms <= end; ms += step){
+        try{
+          const t  = new A.AstroTime(new Date(ms));
+          const eqMars  = A.Equator(A.Body.Mars,  t, observer, true, true);
+          const hm      = A.Horizon(t, observer, eqMars.ra,  eqMars.dec,  'normal');
+          const eqVenus = A.Equator(A.Body.Venus, t, observer, true, true);
+          const hv      = A.Horizon(t, observer, eqVenus.ra, eqVenus.dec, 'normal');
+
+          // normalize azimuth into 0..360 just in case
+          const fixAz = az => ((az % 360) + 360) % 360;
+          mars.push({ az: fixAz(hm.azimuth), alt: hm.altitude });
+          venus.push({ az: fixAz(hv.azimuth), alt: hv.altitude });
+        }catch(e){
+          // Skip a bad sample but keep going
+          console.warn('SkyPath sample failed:', e);
+        }
+      }
+      return { mars, venus };
+    }
+
+
+    function plotSkyPath(canvas, marsPts, venusPts){
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+
+      const P_LEFT = 64, P_RIGHT = 16, P_TOP = 20, P_BOTTOM = 40;
+      const x0 = P_LEFT, y0 = H - P_BOTTOM, x1 = W - P_RIGHT, y1 = P_TOP;
+
+      // Axes & labels
+      ctx.strokeStyle = '#3a4367'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+
+      ctx.fillStyle = '#9aa3c7'; ctx.font = '12px system-ui,-apple-system,Segoe UI,Roboto,Arial';
+      ctx.fillText('Azimuth (deg)', (x0+x1)/2 - 40, y0 + 28);
+      ctx.save(); ctx.translate(x0 - 42, (y0+y1)/2 + 24); ctx.rotate(-Math.PI/2);
+      ctx.fillText('Altitude (deg)', 0, 0); ctx.restore();
+
+      // Ranges: az 0..360, alt -10..90 (clip)
+      const minX=0, maxX=360;
+      const minY=-30, maxY=90;
+      const xmap = (az) => x0 + (az - minX)/(maxX - minX) * (x1 - x0);
+      const ymap = (alt) => y0 - (alt - minY)/(maxY - minY) * (y0 - y1);
+
+      // Grid: vertical at 0/90/180/270/360; horizontal at 0 (horizon), 30, 60
+      ctx.setLineDash([3,3]); ctx.strokeStyle = '#25304f';
+      [90,180,270].forEach(az=>{
+        const xx = xmap(az);
+        ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
+      });
+      [0,30,60].forEach(alt=>{
+        const yy = ymap(alt);
+        ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+      });
+      ctx.setLineDash([]);
+
+      // Horizon (bold)
+      ctx.strokeStyle = '#56608a'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x0, ymap(0)); ctx.lineTo(x1, ymap(0)); ctx.stroke();
+
+      // Draw path with wrap-around & dashed style when below horizon
+      function drawPath(pts, color){
+        const horizon = 0;
+        ctx.lineWidth = 2;
+        let last = null, acc = 0;
+
+        for (let i=1; i<pts.length; i++){
+          const p0 = pts[i-1], p1 = pts[i];
+
+          // Break the stroke if az jumps across 0/360
+          if (last && Math.abs(p1.az - p0.az) > 180) last = null;
+
+          const bothAbove = (p0.alt >= horizon && p1.alt >= horizon);
+          ctx.setLineDash(bothAbove ? [] : [6,4]);
+          ctx.strokeStyle = color;
+
+          const xA = xmap(p0.az), yA = ymap(p0.alt);
+          const xB = xmap(p1.az), yB = ymap(p1.alt);
+
+          ctx.beginPath();
+          if (!last) ctx.moveTo(xA, yA); else ctx.moveTo(last.x, last.y);
+          ctx.lineTo(xB, yB);
+          ctx.stroke();
+
+          if (last){
+            const dx = xB - last.x, dy = yB - last.y;
+            acc += Math.hypot(dx, dy);
+            if (acc >= 160){
+              acc = 0;
+              const ang = Math.atan2(dy, dx);
+              drawArrowhead(ctx, xB, yB, ang, 8, color);
+            }
+          }
+          last = { x:xB, y:yB };
+        }
+      }
+
+      drawPath(marsPts,  CLR_MARS);
+      drawPath(venusPts, CLR_VENUS);
+
+      // Axis labels on bottom
+      ctx.fillStyle = '#9aa3c7';
+      [['N',0],['E',90],['S',180],['W',270],['N',360]].forEach(([lab,az])=>{
+        const xx = xmap(az);
+        ctx.textAlign = 'center';
+        ctx.fillText(lab, xx, y0 + 16);
+      });
+      // Alt ticks
+      [['-10',-10],['0',0],['30',30],['60',60],['90',90]].forEach(([lab,alt],i)=>{
+        const yy = ymap(alt);
+        ctx.textAlign = 'right';
+        ctx.fillText(lab, x0 - 6, yy + 4);
+      });
+    }
+
+    /* ---------- Utilities ---------- */
+    function setNow(){
+      const dt=$('dt'), now=new Date();
+      const isoLocal=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      dt.value=isoLocal;
+    }
+
+    async function fetchElevationForInputs(silent=false){
+      if (!silent) setErr('');
+      const lat = parseFloat($('lat').value);
+      const lon = parseFloat($('lon').value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+        if (!silent) setErr('Please enter valid latitude and longitude first.');
+        return;
+      }
+      const btn = $('btn-fetch-elev');
+      const oldText = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Fetching...';
+      try {
+        const url = 'https://api.open-meteo.com/v1/elevation?latitude='+encodeURIComponent(lat)+'&longitude='+encodeURIComponent(lon);
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        let elev = null;
+        if (data && Array.isArray(data.elevation) && data.elevation.length > 0){
+          elev = data.elevation[0];
+        } else if (typeof data.elevation === 'number'){
+          elev = data.elevation;
+        }
+        if (elev == null || !Number.isFinite(elev)) throw new Error('No elevation in response');
+        $('elev').value = Math.round(elev);
+        updateObserverFromInputs();
+        compute();
+      } catch (e){
+        if (!silent) setErr('Elevation lookup failed: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = oldText;
+      }
+    }
+
+    function useCurrentLocation(){
+      setErr('');
+      if (!('geolocation' in navigator)){ setErr('Geolocation not supported in this browser.'); return; }
+      const btn = $('btn-my-location');
+      const old = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Locating...';
+      navigator.geolocation.getCurrentPosition(async (pos)=>{
+        try{
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          $('preset').value = 'custom';
+          $('lat').value = lat.toFixed(6);
+          $('lon').value = lon.toFixed(6);
+          $('elev').value = '';
+          await fetchElevationForInputs(true);
+          updateObserverFromInputs();
+          await fetchTimezoneForInputs(true);
+          compute();
+        } finally {
+          btn.disabled = false; btn.textContent = old;
+        }
+      }, (err)=>{
+        setErr('Geolocation error: ' + err.message);
+        btn.disabled = false; btn.textContent = old;
+      }, { enableHighAccuracy:true, timeout:10000, maximumAge:30000 });
+    }
+
+    function fmtInTz(iso, tz){
+      const d = new Date(iso);
+      return d.toLocaleString(undefined,{
+        year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', second:'2-digit',
+        hour12:false, timeZone: tz, timeZoneName:'short'
+      }).replace(',', '');
+    }
+
+    let lastMarkers = null;
+
+    function markerPointsForScatter(useTopo){
+      if (!lastMarkers) return [];
+      const times = [
+        { t:lastMarkers.minAngleT, color:CLR_MIN },
+        { t:lastMarkers.maxAngleT, color:CLR_MAX },
+        { t:lastMarkers.minDistT,  color:CLR_MIN_DIST },
+        { t:lastMarkers.maxDistT,  color:CLR_MAX_DIST }
+      ];
+      return times.map(obj=>{
+        const tt = new Astronomy.AstroTime(new Date(obj.t));
+        return { x: distanceAtTime(tt), y: angleAtTime(tt, $('chk-topo').checked), color: obj.color };
+      });
+    }
+
+    function currentScatterOpts(){
+      return {
+        arrows:   document.getElementById('chk-time-arrows')?.checked,
+        gradient: document.getElementById('chk-time-gradient')?.checked
+      };
+    }
+
+    function replotAll(){
+      const days=Math.max(1, parseInt($('scan-days').value)||30);
+      const step=Math.max(1, parseInt($('scan-step').value)||6);
+      const dtInput=$('dt').value;
+      const center=dtInput? new Date(dtInput): new Date();
+      const useTopo=$('chk-topo').checked;
+
+      const s=collectSeries(center, days, step, useTopo);
+      const markers = [
+        { t:center.getTime(), color: CLR_NOW, name:'now' },
+        ...(lastMarkers ? [
+          { t:lastMarkers.minAngleT, color: CLR_MIN,       name:'minAngle' },
+          { t:lastMarkers.maxAngleT, color: CLR_MAX,       name:'maxAngle' },
+          { t:lastMarkers.minDistT,  color: CLR_MIN_DIST,  name:'minDist'  },
+          { t:lastMarkers.maxDistT,  color: CLR_MAX_DIST,  name:'maxDist'  }
+        ] : [])
+      ];
+      plotSeries($('chart-angle'), s.xs, s.angle, 'Angular separation (deg) ' + (useTopo?'(topocentric)':'(geocentric)'), markers);
+      plotSeries($('chart-dist'),  s.xs, s.dist,  'Distance (AU)', markers);
+      plotAngleVsDistance($('chart-angle-dist'), s.dist, s.angle, markerPointsForScatter(useTopo), currentScatterOpts());
+
+      // Sky path
+      const skyHours = Math.max(1, parseInt($('sky-hours').value)||12);
+      const skyStep  = Math.max(1, parseInt($('sky-step').value)||10);
+      const sp = collectSkyPath(center, skyHours, skyStep);
+      plotSkyPath($('chart-sky'), sp.mars, sp.venus);
+
+      setLegend();
+    }
+
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      // Robust Back button
+      (function(){
+        var a = document.getElementById('back');
+        if (location.protocol === 'http:' || location.protocol === 'https:') {
+          a.href = 'https://abhlsd.com/ABHLSD.html';
+        } else {
+          a.href = '../ABHLSD.html';
+        }
+      })();
+
+      if (typeof window.Astronomy==='undefined'){ setErr('astronomy.browser.min.js did not load.'); }
+      setInputsFromPreset('brisbane');
+      await fetchTimezoneForInputs(true);
+      setLegend();
+
+      $('preset').addEventListener('change', (e)=>{ const val=e.target.value; if (val==='custom') return; setInputsFromPreset(val); });
+      $('btn-update-observer').addEventListener('click', async ()=>{ updateObserverFromInputs(); await fetchTimezoneForInputs(true); compute(); });
+      $('btn-fetch-elev').addEventListener('click', ()=>fetchElevationForInputs(false));
+      $('btn-my-location').addEventListener('click', useCurrentLocation);
+      $('btn-now').addEventListener('click', ()=>{ setNow(); compute(); });
+      $('btn-calc').addEventListener('click', compute);
+      $('chk-topo').addEventListener('change', compute);
+
+      // Replot time charts + scatter + sky on toggles
+      $('chk-use-obs-tz').addEventListener('change', replotAll);
+      ['chk-time-arrows','chk-time-gradient'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', replotAll);
+      });
+
+      $('btn-scan').addEventListener('click', async ()=>{
+        setErr('');
+        const days=Math.max(1, parseInt($('scan-days').value)||30);
+        const step=Math.max(1, parseInt($('scan-step').value)||6);
+        const dtInput=$('dt').value;
+        const center=dtInput? new Date(dtInput): new Date();
+        const useTopo=$('chk-topo').checked;
+        const res=await scanExtrema(center, days, step, useTopo);
+
+        lastMarkers = {
+          minAngleT: Date.parse(res.minAngle.time),
+          maxAngleT: Date.parse(res.maxAngle.time),
+          minDistT : Date.parse(res.minDistance.time),
+          maxDistT : Date.parse(res.maxDistance.time)
+        };
+
+        if (!observerTz){ await fetchTimezoneForInputs(true); }
+
+        const preferLocal = useObserverTz();
+        const wrapPref = (label, content) => preferLocal === (label==='local')
+          ? '<strong>' + content + '</strong>' : content;
+
+        $('scan-results').innerHTML =
+          '<span class="min-line">Closest (min) angular separation:   ' + res.minAngle.deg.toFixed(6) + ' deg</span><br/>' +
+          '  • ' + wrapPref('utc',   'UTC: ' + res.minAngle.time) + '<br/>' +
+          '  • ' + wrapPref('local', 'Local (' + (observerTzLabel||'') + '): ' + fmtInTz(res.minAngle.time, observerTz)) + '<br/>' +
+          '<span class="max-line">Greatest (max) angular separation:  ' + res.maxAngle.deg.toFixed(6) + ' deg</span><br/>' +
+          '  • ' + wrapPref('utc',   'UTC: ' + res.maxAngle.time) + '<br/>' +
+          '  • ' + wrapPref('local', 'Local (' + (observerTzLabel||'') + '): ' + fmtInTz(res.maxAngle.time, observerTz)) + '<br/>' +
+          '<span class="min-dist-line">Closest (min) distance:  ' + res.minDistance.au.toFixed(6) + ' AU (' + res.minDistance.km.toLocaleString() + ' km)</span><br/>' +
+          '  • ' + wrapPref('utc',   'UTC: ' + res.minDistance.time) + '<br/>' +
+          '  • ' + wrapPref('local', 'Local (' + (observerTzLabel||'') + '): ' + fmtInTz(res.minDistance.time, observerTz)) + '<br/>' +
+          '<span class="max-dist-line">Greatest (max) distance: ' + res.maxDistance.au.toFixed(6) + ' AU (' + res.maxDistance.km.toLocaleString() + ' km)</span><br/>' +
+          '  • ' + wrapPref('utc',   'UTC: ' + res.maxDistance.time) + '<br/>' +
+          '  • ' + wrapPref('local', 'Local (' + (observerTzLabel||'') + '): ' + fmtInTz(res.maxDistance.time, observerTz)) + '<br/>' +
+          '(Times refined to ~10 seconds; tick labels respect the timezone toggle)';
+
+        // Replot everything including sky
+        replotAll();
+      });
+
+      $('btn-plot').addEventListener('click', ()=>{
+        setErr('');
+        replotAll();
+      });
+
+      function saveCanvasAsPng(canvas, filename){
+        const link=document.createElement('a');
+        link.download=filename;
+        link.href=canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      function downloadText(filename, text){
+        const blob=new Blob([text],{type:'text/plain'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url; a.download=filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+
+      $('btn-save-png').addEventListener('click', ()=>{
+        // Make sure charts are freshly drawn before saving
+        replotAll();
+        const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+        saveCanvasAsPng($('chart-angle'),      'angle_' + stamp + '.png');
+        saveCanvasAsPng($('chart-dist'),       'distance_' + stamp + '.png');
+        saveCanvasAsPng($('chart-angle-dist'), 'angle_vs_distance_' + stamp + '.png');
+        saveCanvasAsPng($('chart-sky'),        'sky_path_' + stamp + '.png');
+      });
+
+      $('btn-download-csv').addEventListener('click', ()=>{
+        const days=Math.max(1, parseInt($('scan-days').value)||30);
+        const step=Math.max(1, parseInt($('scan-step').value)||6);
+        const dtInput=$('dt').value;
+        const center=dtInput? new Date(dtInput): new Date();
+        const useTopo=$('chk-topo').checked;
+        const s=collectSeries(center, days, step, useTopo);
+        let csv='time_iso,angle_deg(' + (useTopo?'topocentric':'geocentric') + '),distance_au,distance_km\n';
+        for(let i=0;i<s.xs.length;i++){
+          const iso=new Date(s.xs[i]).toISOString(); // CSV stays in UTC
+          const ang=s.angle[i];
+          const au=s.dist[i];
+          const km=au*AU_KM;
+          csv+=iso+','+ang.toFixed(8)+','+au.toFixed(8)+','+Math.round(km)+'\n';
+        }
+        const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+        downloadText('mars_venus_scan_' + stamp + '.csv', csv);
+      });
+
+      setNow();
+      compute();
+      replotAll();
+    });
+  })();
+  </script>
+</body>
+</html>
