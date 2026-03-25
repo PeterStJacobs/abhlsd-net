@@ -2264,6 +2264,11 @@ function renderInspector(){
     n.textContent = bits.join(' • ');
     div.appendChild(n);
 
+    const src = document.createElement('div');
+    src.className = 'note';
+    src.textContent = 'Weather source: Open-Meteo';
+    div.appendChild(src);
+
     p.appendChild(div);
   }
   if(snap.silentSong){
