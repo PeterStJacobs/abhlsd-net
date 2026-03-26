@@ -135,6 +135,7 @@ const state = {
   }
 };
 
+/*
 function ensureEastWestOrder(){
   const now = DateTime.now();
   const a = now.setZone(state.tamaraTZ);
@@ -154,6 +155,8 @@ function ensureEastWestOrder(){
     }
   }
 }
+*/
+
 
 // --------------- Updated Helpers (simplified) ------------
 const AFDS_LOCATION_FEATURE = 'supportsAFdS';
@@ -373,6 +376,7 @@ function locationFromChoice(choice, featureName = 'supportsWeather'){
 function weatherLocationForDisplayTZ(){
   return locationFromChoice(state.displayChoice, 'supportsWeather');
 }
+*/
 
 function weatherWindowForDisplayTZ(){
   const today = DateTime.now().setZone(state.displayTZ).startOf('day');
@@ -381,7 +385,6 @@ function weatherWindowForDisplayTZ(){
     endISO: today.plus({ days: WEATHER.futureDays }).toISODate()
   };
 }
-*/
 
 function weatherIconForCode(code){
   const n = Number(code);
