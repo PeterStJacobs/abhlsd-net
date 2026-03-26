@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mars–Venus Separation | ABHLSD</title>
+<meta name="theme-color" content="#002D89" />
+<meta name="description" content="Mars–Venus angular separation and planet-to-planet distance calculator for ABHLSD." />
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="./style.css" />
+
+<!-- Favicons for the Mars–Venus page -->
+<link rel="icon" type="image/png" sizes="32x32" href="../images/MV_favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../images/MV_favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../images/MV_favicon-180x180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../images/MV_favicon-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="../images/MV_favicon-512x512.png">
+<link rel="shortcut icon" href="../images/MV-favicon.png">
+
+<script defer src="https://cdn.jsdelivr.net/npm/astronomy-engine@2/astronomy.browser.min.js"></script>
+<script defer src="../shared/location.js"></script>
+<script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a id="backLink" class="btn back-btn" href="../index.html" aria-label="Back to ABHLSD">← Back</a>
+      </div>
+
+      <div class="topbar-center">
+        <div class="brand">Mars–Venus Separation</div>
+        <div class="subbrand">ABHLSD personal tools</div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="badge">Mars • Venus</div>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="panel intro-panel">
+        <div class="panel-inner intro-copy">
+          <h1 class="page-title">Angular separation and planet-to-planet distance</h1>
+          <p class="lead">
+            Local calculations via <span class="mono-inline">astronomy-engine</span>. Toggle topocentric angle,
+            scan across time, plot the paths, and switch the time-axis display between observer timezone and UTC.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-inner">
+          <div class="tool-grid two-cols gap-lg">
+            <div>
+              <label for="dt">Date &amp; time (local)</label>
+              <input id="dt" type="datetime-local" />
+
+              <div class="button-row mt-12">
+                <button id="btn-now" type="button" class="btn">Use current time</button>
+                <button id="btn-calc" type="button" class="btn">Calculate</button>
+              </div>
+
+              <div class="checkrow">
+                <input id="chk-topo" type="checkbox" />
+                <label for="chk-topo" class="inline-label">Use topocentric angle (location-dependent)</label>
+                <span class="tip">
+                  <button class="tip-btn" type="button" aria-label="What does topocentric mean?" aria-describedby="tip-topo">?</button>
+                  <div id="tip-topo" role="tooltip" class="tip-content">
+                    <p><strong>Geocentric</strong> angle: from Earth’s centre. Same for all locations.</p>
+                    <p><strong>Topocentric</strong> angle: from your observing site. Includes parallax, so location can matter slightly.</p>
+                    <ul>
+                      <li>For planets, the difference is usually small.</li>
+                      <li>Plots, scan results, and CSV use whichever mode is selected.</li>
+                    </ul>
+                  </div>
+                </span>
+              </div>
+
+              <div class="checkrow">
+                <input id="chk-use-obs-tz" type="checkbox" checked />
+                <label for="chk-use-obs-tz" class="inline-label">Use observer timezone for time charts</label>
+              </div>
+
+              <div class="checkrow">
+                <input id="chk-time-arrows" type="checkbox" />
+                <label for="chk-time-arrows" class="inline-label">Show time arrows on angle-vs-distance plot</label>
+              </div>
+
+              <div class="checkrow">
+                <input id="chk-time-gradient" type="checkbox" />
+                <label for="chk-time-gradient" class="inline-label">Color angle-vs-distance path by time</label>
+              </div>
+
+              <div id="err" class="error" role="alert" aria-live="polite"></div>
+              <p class="small mt-12">
+                Angle uses geocentric or topocentric mode depending on the checkbox. Distance is heliocentric.
+                Alt/Az readouts are topocentric.
+              </p>
+            </div>
+
+            <div>
+              <div class="results-grid">
+                <div class="result-tile">
+                  <div class="k">Angular separation</div>
+                  <div class="v" id="angle">—</div>
+                  <div class="sub mono" id="angle-sub">—</div>
+                </div>
+
+                <div class="result-tile">
+                  <div class="k">Planet-to-planet distance</div>
+                  <div class="v" id="dist-au">—</div>
+                  <div class="sub mono" id="dist-km">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tool-grid two-cols gap-md mt-16">
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="k">Mars (geocentric apparent)</div>
+            <div class="v mono compact-value" id="mars-radec">—</div>
+            <div class="sub mono" id="mars-xyz">—</div>
+            <div class="sub mono" id="mars-horiz">—</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-inner">
+            <div class="k">Venus (geocentric apparent)</div>
+            <div class="v mono compact-value" id="venus-radec">—</div>
+            <div class="sub mono" id="venus-xyz">—</div>
+            <div class="sub mono" id="venus-horiz">—</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel mt-16">
+        <div class="panel-inner">
+          <div class="section-title">Observer settings</div>
+
+          <div class="tool-grid three-cols gap-md mt-12">
+            <div class="span-all">
+              <label for="preset">Location preset</label>
+              <select id="preset"></select>
+            </div>
+
+            <div>
+              <label for="lat">Observer latitude (deg)</label>
+              <input id="lat" type="number" step="0.0001" value="-27.4698" />
+            </div>
+
+            <div>
+              <label for="lon">Observer longitude (deg)</label>
+              <input id="lon" type="number" step="0.0001" value="153.0251" />
+            </div>
+
+            <div>
+              <label for="elev">Elevation (m)</label>
+              <input id="elev" type="number" step="1" value="27" />
+            </div>
+
+            <div class="span-all">
+              <label for="tz">Time zone (IANA)</label>
+              <input id="tz" type="text" list="tzlist" placeholder="e.g., Australia/Brisbane" />
+              <datalist id="tzlist"></datalist>
+            </div>
+
+            <div class="span-all">
+              <div class="button-row">
+                <button id="btn-update-observer" class="btn btn-secondary" type="button">Update observer</button>
+                <button id="btn-fetch-elev" class="btn btn-secondary" type="button" title="Lookup elevation by latitude and longitude">Fetch elevation</button>
+                <button id="btn-my-location" class="btn btn-secondary" type="button" title="Use device GPS">Use current location</button>
+              </div>
+            </div>
+          </div>
+
+          <p class="small mt-12">
+            Presets come from the shared ABHLSD location helper. “Use current location” asks the browser for device location;
+            timezone falls back to the device timezone.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel mt-16">
+        <div class="panel-inner">
+          <div class="section-title">Scan and plot</div>
+
+          <div class="scan-control-row mt-12">
+            <div class="scan-control">
+              <label for="scan-days">Scan window (days, ± around selected time)</label>
+              <input id="scan-days" type="number" step="1" value="30" />
+            </div>
+
+            <div class="scan-control">
+              <label for="scan-step">Step size (hours)</label>
+              <input id="scan-step" type="number" step="1" value="6" />
+            </div>
+
+            <div class="button-row align-end">
+              <button id="btn-scan" type="button" class="btn">Find closest &amp; greatest</button>
+              <button id="btn-plot" type="button" class="btn btn-secondary">Plot angle &amp; distance</button>
+              <button id="btn-download-csv" type="button" class="btn btn-secondary">Download CSV</button>
+              <button id="btn-save-png" type="button" class="btn btn-secondary">Save charts as PNG</button>
+            </div>
+          </div>
+
+          <div id="scan-results" class="scan-results mono mt-12">—</div>
+
+          <div class="tool-grid two-cols gap-md mt-16">
+            <div>
+              <div class="k chart-label">Angular separation (deg) vs time</div>
+              <canvas id="chart-angle" width="500" height="260"></canvas>
+            </div>
+            <div>
+              <div class="k chart-label">Distance (AU) vs time</div>
+              <canvas id="chart-dist" width="500" height="260"></canvas>
+            </div>
+          </div>
+
+          <div class="legend legend-time" id="legend-time"></div>
+
+          <div class="mt-16">
+            <div class="k chart-label">Angle (deg) vs distance (AU)</div>
+            <canvas id="chart-angle-dist" width="1024" height="260"></canvas>
+            <div id="legend-scatter" class="legend-scatter"></div>
+          </div>
+        </div>
+      </section>
+
+      <p class="small footer-note">CDN: astronomy-engine@2. No external timezone API required.</p>
+    </main>
+  </div>
+</body>
+</html>
