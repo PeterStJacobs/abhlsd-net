@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Red Thread Notebook" />
+  <title>The Red Thread Notebook</title>
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/RTFN_favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/RTFN_favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/RTFN_favicon-180x180.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/images/RTFN_favicon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/images/RTFN_favicon-512x512.png" />
+  <link rel="shortcut icon" href="/images/RTFN-favicon.png" />
+
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn backbtn" href="../index.html" aria-label="Back to ABHLSD.net">← Back to ABHLSD.net</a>
+      </div>
+
+      <div class="topbar-center">
+        <div class="brand">The Red Thread Notebook</div>
+        <div class="subbrand">Film, books, and the words that follow them</div>
+      </div>
+
+      <div class="topbar-right">
+        <span class="badge">RTN</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel left" id="leftPanel" aria-label="Notebook index">
+        <div class="panel-inner">
+          <div class="section-tight">
+            <div class="section-title">Notebook index</div>
+            <p class="muted intro-copy">
+              Select an entry. The writing appears in the centre panel, while notes, motifs,
+              links, and images live on the right.
+            </p>
+          </div>
+
+          <div class="index-tools">
+            <div class="pillrow" id="typePills" aria-label="Entry types"></div>
+          </div>
+
+          <div class="entry-list" id="entryList" role="list"></div>
+        </div>
+      </aside>
+
+      <section class="center" aria-label="Notebook entry">
+        <div class="entry-header panel">
+          <div class="entry-header-inner">
+            <div>
+              <div class="eyebrow" id="entryEyebrow">—</div>
+              <h1 class="entry-title" id="entryTitle">—</h1>
+              <div class="entry-subtitle" id="entrySubtitle">—</div>
+            </div>
+            <div class="entry-meta-inline" id="entryMetaInline"></div>
+          </div>
+        </div>
+
+        <article class="entry-surface panel" id="entrySurface" aria-live="polite">
+          <div class="panel-inner entry-body-wrap">
+            <div class="dedication" id="entryDedication"></div>
+            <div class="entry-body" id="entryBody"></div>
+          </div>
+        </article>
+      </section>
+
+      <aside class="panel right" id="rightPanel" aria-label="Entry context">
+        <div class="panel-inner context-column">
+          <section class="context-block">
+            <div class="section-title">At a glance</div>
+            <div class="facts" id="contextFacts"></div>
+          </section>
+
+          <section class="context-block">
+            <div class="section-title">Annotations</div>
+            <div class="stack" id="contextAnnotations"></div>
+          </section>
+
+          <section class="context-block">
+            <div class="section-title">Motifs</div>
+            <div class="tag-cloud" id="contextMotifs"></div>
+          </section>
+
+          <section class="context-block">
+            <div class="section-title">Links</div>
+            <div class="stack" id="contextLinks"></div>
+          </section>
+
+          <section class="context-block">
+            <div class="section-title">Images</div>
+            <div class="image-stack" id="contextImages"></div>
+          </section>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
