@@ -2,17 +2,25 @@ import * as Astronomy from 'https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19
 
 const { DateTime } = luxon;
 
+/*
 const TZKEY_MAP = {
   ET_Toronto: 'America/Toronto',
   AZ_Phoenix: 'America/Phoenix',
   QLD_Brisbane: 'Australia/Brisbane',
   ASTRONOMICAL_UTC: 'UTC',
+}; */
+
+const DEFAULTS = {
+  tamaraChoice: 'LOC:AZ_Phoenix',
+  martinChoice: 'LOC:QLD_Brisbane',
+  displayChoice: `TZ:${Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'}`,
 };
 
+/*
 const DEFAULTS = {
   tamaraTZ: 'America/Phoenix',
   martinTZ: 'Australia/Brisbane',
-};
+}; */
 
 const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
@@ -42,6 +50,12 @@ const LUNAR_PHASES = {
 
 const WEATHER = {
   pastDays: 2,
+  futureDays: 4
+};
+
+/*
+const WEATHER = {
+  pastDays: 2,
   futureDays: 4,
   locationsByTimezone: {
     'America/Phoenix': {
@@ -60,7 +74,7 @@ const WEATHER = {
       longitude: -79.3832
     }
   }
-};
+}; */
 
 function isFridayDateISO(dateISO){
   const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
@@ -92,11 +106,14 @@ function endOfWeekSaturday(dt){
 
 const state = {
   view: 'month',
+  displayChoice: DEFAULTS.displayChoice,
   displayTZ: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   focusDateISO: DateTime.now().toISODate(),
   filters: { superMonths: true, specialDays: true, standardDays: true, oneOff: true },
-  tamaraTZ: DEFAULTS.tamaraTZ,
-  martinTZ: DEFAULTS.martinTZ,
+  tamaraChoice: DEFAULTS.tamaraChoice,
+  tamaraTZ: 'America/Phoenix',
+  martinChoice: DEFAULTS.martinChoice,
+  martinTZ: 'Australia/Brisbane',
   snapshot: null,
   highlightDateISO: null,
   data: {
@@ -117,6 +134,36 @@ const state = {
     weatherPendingKey: null,
   }
 };
+
+// ---------- Location Helpers ----------
+function locationHelpers(){
+  return window.ABHLSD_LOCATION_HELPERS || null;
+}
+
+function resolveAFdSChoice(choice, featureName = 'supportsAFdS'){
+  const helpers = locationHelpers();
+  if(!helpers?.resolveSelection) return null;
+  return helpers.resolveSelection(choice, featureName);
+}
+
+function timezoneFromChoice(choice, fallbackTZ = 'UTC'){
+  const resolved = resolveAFdSChoice(choice, 'supportsAFdS');
+  return resolved?.timezone || fallbackTZ;
+}
+
+function locationFromChoice(choice, featureName = 'supportsWeather'){
+  const helpers = locationHelpers();
+  if(!helpers) return null;
+
+  const resolved = helpers.resolveSelection?.(choice, featureName);
+  if(resolved?.location) return resolved.location;
+
+  if(resolved?.timezone && helpers.getPrimaryLocationForTimezone){
+    return helpers.getPrimaryLocationForTimezone(resolved.timezone, featureName) || null;
+  }
+
+  return null;
+}
 
 // ---------- Utilities ----------
 function parseCSV(text){
@@ -455,7 +502,7 @@ function lunarPhasesForDate(dateISO){
 /* ------------- weather functions --------------- */
 
 function weatherLocationForDisplayTZ(){
-  return WEATHER.locationsByTimezone[state.displayTZ] || null;
+  return locationFromChoice(state.displayChoice, 'supportsWeather');
 }
 
 function weatherWindowForDisplayTZ(){
@@ -1121,67 +1168,57 @@ function attachFridayFlowerPreview(imgEl){
 }
 
 function setUpTZList(){
-  let zones = [];
+  const helpers = locationHelpers();
+  if(!helpers?.getHybridOptionsFor) return;
 
-  try{
-    zones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [];
-  }catch(e){
-    zones = [];
-  }
+  const options = helpers.getHybridOptionsFor('supportsAFdS', {
+    includeAllIana: true,
+    includeUTC: true
+  });
 
-  if(!zones || zones.length === 0){
-    zones = [
-      DEFAULTS.tamaraTZ,
-      DEFAULTS.martinTZ,
-      'America/Toronto',
-      'UTC',
-      'Europe/London',
-      'Asia/Tokyo'
-    ];
-  }
-
-  const pinned = ['America/Phoenix', 'America/Toronto', 'Australia/Brisbane'];
-
-  function fillSelectPinned(sel, currentVal, fallbackVal){
+  function fillHybridSelect(sel, currentChoice, fallbackChoice){
     if(!sel) return;
     sel.innerHTML = '';
 
-    const zonesSet = new Set(zones);
+    const locGroup = document.createElement('optgroup');
+    locGroup.label = 'Locations';
 
-    for(const z of pinned){
-      if(!zonesSet.has(z)) continue;
+    for(const item of options.locations){
       const opt = document.createElement('option');
-      opt.value = z;
-      opt.textContent = z;
-      sel.appendChild(opt);
+      opt.value = item.value;
+      opt.textContent = item.label;
+      locGroup.appendChild(opt);
     }
 
-    const sep = document.createElement('option');
-    sep.value = '';
-    sep.textContent = '-------------------';
-    sep.disabled = true;
-    sel.appendChild(sep);
+    const tzGroup = document.createElement('optgroup');
+    tzGroup.label = 'Time zones';
 
-    for(const z of zones){
-      if(pinned.includes(z)) continue;
+    for(const item of options.timezones){
       const opt = document.createElement('option');
-      opt.value = z;
-      opt.textContent = z;
-      sel.appendChild(opt);
+      opt.value = item.value;
+      opt.textContent = item.label;
+      tzGroup.appendChild(opt);
     }
 
-    sel.value = currentVal || '';
-    if(!sel.value){
-      const fb = (fallbackVal && zonesSet.has(fallbackVal))
-        ? fallbackVal
-        : (pinned.find(z=>zonesSet.has(z)) || zones[0] || 'UTC');
-      sel.value = fb;
-    }
+    sel.appendChild(locGroup);
+    sel.appendChild(tzGroup);
+
+    const allValues = new Set([
+      ...options.locations.map(x => x.value),
+      ...options.timezones.map(x => x.value)
+    ]);
+
+    const chosen = allValues.has(currentChoice) ? currentChoice : fallbackChoice;
+    sel.value = allValues.has(chosen) ? chosen : '';
   }
 
-  fillSelectPinned(el('tzTamara'), state.tamaraTZ, DEFAULTS.tamaraTZ);
-  fillSelectPinned(el('tzMartin'), state.martinTZ, DEFAULTS.martinTZ);
-  fillSelectPinned(el('displayTZ'), state.displayTZ, state.displayTZ);
+  fillHybridSelect(el('tzTamara'), state.tamaraChoice, DEFAULTS.tamaraChoice);
+  fillHybridSelect(el('tzMartin'), state.martinChoice, DEFAULTS.martinChoice);
+  fillHybridSelect(el('displayTZ'), state.displayChoice, DEFAULTS.displayChoice);
+
+  state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
+  state.martinTZ = timezoneFromChoice(state.martinChoice, 'Australia/Brisbane');
+  state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
 
   ensureEastWestOrder();
 }
@@ -2923,16 +2960,14 @@ function ensureEastWestOrder(){
   if(a.offset === b.offset) return;
 
   if(a.offset < b.offset){
-    const tmp = state.tamaraTZ;
-    state.tamaraTZ = state.martinTZ;
-    state.martinTZ = tmp;
+    [state.tamaraTZ, state.martinTZ] = [state.martinTZ, state.tamaraTZ];
+    [state.tamaraChoice, state.martinChoice] = [state.martinChoice, state.tamaraChoice];
 
     const iA = el('tzTamara');
     const iB = el('tzMartin');
     if(iA && iB){
-      const t = iA.value;
-      iA.value = iB.value;
-      iB.value = t;
+      iA.value = state.tamaraChoice;
+      iB.value = state.martinChoice;
     }
   }
 }
@@ -2991,7 +3026,9 @@ function bindControls(){
   el('toggleGregorian').addEventListener('change', ()=> render());
 
   el('displayTZ').addEventListener('change', (e)=>{
-    state.displayTZ = e.target.value;
+    state.displayChoice = e.target.value || DEFAULTS.displayChoice;
+    state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
+
     buildLunarPhaseCache();
 
     if(state.snapshot?.dateISO){
@@ -3076,13 +3113,31 @@ function bindControls(){
   });
 
   el('tzTamara').addEventListener('change', (e)=>{
-    state.tamaraTZ = e.target.value || DEFAULTS.tamaraTZ;
+    state.tamaraChoice = e.target.value || DEFAULTS.tamaraChoice;
+    state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
     ensureEastWestOrder();
+
+    if(state.snapshot?.dateISO){
+      snapshotDay(state.snapshot.dateISO);
+    }else{
+      render();
+    }
+
+    tickClocks();
   });
 
   el('tzMartin').addEventListener('change', (e)=>{
-    state.martinTZ = e.target.value || DEFAULTS.martinTZ;
+    state.martinChoice = e.target.value || DEFAULTS.martinChoice;
+    state.martinTZ = timezoneFromChoice(state.martinChoice, 'Australia/Brisbane');
     ensureEastWestOrder();
+
+    if(state.snapshot?.dateISO){
+      snapshotDay(state.snapshot.dateISO);
+    }else{
+      render();
+    }
+
+    tickClocks();
   });
 
   const sheet = el('bottomSheet');
