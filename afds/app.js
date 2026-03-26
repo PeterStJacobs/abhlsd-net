@@ -135,6 +135,209 @@ const state = {
   }
 };
 
+function ensureEastWestOrder(){
+  const now = DateTime.now();
+  const a = now.setZone(state.tamaraTZ);
+  const b = now.setZone(state.martinTZ);
+
+  if(a.offset === b.offset) return;
+
+  if(a.offset < b.offset){
+    [state.tamaraTZ, state.martinTZ] = [state.martinTZ, state.tamaraTZ];
+    [state.tamaraChoice, state.martinChoice] = [state.martinChoice, state.tamaraChoice];
+
+    const iA = el('tzTamara');
+    const iB = el('tzMartin');
+    if(iA && iB){
+      iA.value = state.tamaraChoice;
+      iB.value = state.martinChoice;
+    }
+  }
+}
+
+// --------------- Updated Helpers (simplified) ------------
+const AFDS_LOCATION_FEATURE = 'supportsAFdS';
+const WEATHER_LOCATION_FEATURE = 'supportsWeather';
+const DEFAULT_TAMARA_TZ = 'America/Phoenix';
+const DEFAULT_MARTIN_TZ = 'Australia/Brisbane';
+const DEFAULT_DISPLAY_TZ = 'UTC';
+
+function locationHelpers(){
+  return window.ABHLSD_LOCATION_HELPERS || null;
+}
+
+function resolveChoice(choice, featureName = AFDS_LOCATION_FEATURE){
+  const helpers = locationHelpers();
+  if(!helpers?.resolveSelection) return null;
+  return helpers.resolveSelection(choice, featureName);
+}
+
+function timezoneFromChoice(choice, fallbackTZ = DEFAULT_DISPLAY_TZ){
+  return resolveChoice(choice)?.timezone || fallbackTZ;
+}
+
+function locationFromChoice(choice, featureName = WEATHER_LOCATION_FEATURE){
+  const helpers = locationHelpers();
+  if(!helpers) return null;
+
+  const resolved = helpers.resolveSelection?.(choice, featureName);
+  if(resolved?.location) return resolved.location;
+
+  if(resolved?.timezone && helpers.getPrimaryLocationForTimezone){
+    return helpers.getPrimaryLocationForTimezone(resolved.timezone, featureName) || null;
+  }
+
+  return null;
+}
+
+function weatherLocationForDisplayTZ(){
+  return locationFromChoice(state.displayChoice, WEATHER_LOCATION_FEATURE);
+}
+
+function syncTZStateFromChoices(){
+  state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, DEFAULT_TAMARA_TZ);
+  state.martinTZ = timezoneFromChoice(state.martinChoice, DEFAULT_MARTIN_TZ);
+  state.displayTZ = timezoneFromChoice(state.displayChoice, DEFAULT_DISPLAY_TZ);
+}
+
+function fillHybridSelect(sel, options, currentChoice, fallbackChoice){
+  if(!sel) return;
+
+  sel.innerHTML = '';
+
+  const locGroup = document.createElement('optgroup');
+  locGroup.label = 'Locations';
+
+  for(const item of options.locations){
+    const opt = document.createElement('option');
+    opt.value = item.value;
+    opt.textContent = item.label;
+    locGroup.appendChild(opt);
+  }
+
+  const tzGroup = document.createElement('optgroup');
+  tzGroup.label = 'Time zones';
+
+  for(const item of options.timezones){
+    const opt = document.createElement('option');
+    opt.value = item.value;
+    opt.textContent = item.label;
+    tzGroup.appendChild(opt);
+  }
+
+  sel.appendChild(locGroup);
+  sel.appendChild(tzGroup);
+
+  const allowed = new Set([
+    ...options.locations.map(item => item.value),
+    ...options.timezones.map(item => item.value),
+  ]);
+
+  const chosen = allowed.has(currentChoice) ? currentChoice : fallbackChoice;
+  sel.value = allowed.has(chosen) ? chosen : '';
+}
+
+function setUpTZList(){
+  const helpers = locationHelpers();
+  if(!helpers?.getHybridOptionsFor) return;
+
+  const options = helpers.getHybridOptionsFor(AFDS_LOCATION_FEATURE, {
+    includeAllIana: true,
+    includeUTC: true,
+  });
+
+  fillHybridSelect(el('tzTamara'), options, state.tamaraChoice, DEFAULTS.tamaraChoice);
+  fillHybridSelect(el('tzMartin'), options, state.martinChoice, DEFAULTS.martinChoice);
+  fillHybridSelect(el('displayTZ'), options, state.displayChoice, DEFAULTS.displayChoice);
+
+  /*
+  fillHybridSelect(el('tzTamara'), state.tamaraChoice, state.tamaraChoice, DEFAULTS.tamaraChoice);
+  fillHybridSelect(el('tzMartin'), state.martinChoice, state.martinChoice, DEFAULTS.martinChoice);
+  fillHybridSelect(el('displayTZ'), state.displayChoice, state.displayChoice, DEFAULTS.displayChoice);
+  */
+
+  syncTZStateFromChoices();
+  ensureEastWestOrder();
+}
+
+function ensureEastWestOrder(){
+  const now = DateTime.now();
+  const a = now.setZone(state.tamaraTZ);
+  const b = now.setZone(state.martinTZ);
+
+  if(a.offset === b.offset) return;
+
+  if(a.offset < b.offset){
+    [state.tamaraTZ, state.martinTZ] = [state.martinTZ, state.tamaraTZ];
+    [state.tamaraChoice, state.martinChoice] = [state.martinChoice, state.tamaraChoice];
+
+    const tamaraSel = el('tzTamara');
+    const martinSel = el('tzMartin');
+
+    if(tamaraSel) tamaraSel.value = state.tamaraChoice;
+    if(martinSel) martinSel.value = state.martinChoice;
+  }
+}
+
+/*
+// --------------- Time Zone Setup Helpers ----------
+
+function setUpTZList(){
+  const helpers = locationHelpers();
+  if(!helpers?.getHybridOptionsFor) return;
+
+  const options = helpers.getHybridOptionsFor('supportsAFdS', {
+    includeAllIana: true,
+    includeUTC: true
+  });
+
+  function fillHybridSelect(sel, currentChoice, fallbackChoice){
+    if(!sel) return;
+    sel.innerHTML = '';
+
+    const locGroup = document.createElement('optgroup');
+    locGroup.label = 'Locations';
+
+    for(const item of options.locations){
+      const opt = document.createElement('option');
+      opt.value = item.value;
+      opt.textContent = item.label;
+      locGroup.appendChild(opt);
+    }
+
+    const tzGroup = document.createElement('optgroup');
+    tzGroup.label = 'Time zones';
+
+    for(const item of options.timezones){
+      const opt = document.createElement('option');
+      opt.value = item.value;
+      opt.textContent = item.label;
+      tzGroup.appendChild(opt);
+    }
+
+    sel.appendChild(locGroup);
+    sel.appendChild(tzGroup);
+
+    const allValues = new Set([
+      ...options.locations.map(x => x.value),
+      ...options.timezones.map(x => x.value)
+    ]);
+
+    const chosen = allValues.has(currentChoice) ? currentChoice : fallbackChoice;
+    sel.value = allValues.has(chosen) ? chosen : '';
+  }
+
+  fillHybridSelect(el('tzTamara'), state.tamaraChoice, DEFAULTS.tamaraChoice);
+  fillHybridSelect(el('tzMartin'), state.martinChoice, DEFAULTS.martinChoice);
+  fillHybridSelect(el('displayTZ'), state.displayChoice, DEFAULTS.displayChoice);
+
+  state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
+  state.martinTZ = timezoneFromChoice(state.martinChoice, 'Australia/Brisbane');
+  state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
+
+  ensureEastWestOrder();
+}
+
 // ---------- Location Helpers ----------
 function locationHelpers(){
   return window.ABHLSD_LOCATION_HELPERS || null;
@@ -163,6 +366,260 @@ function locationFromChoice(choice, featureName = 'supportsWeather'){
   }
 
   return null;
+}
+
+// ------------- weather functions --------------- 
+
+function weatherLocationForDisplayTZ(){
+  return locationFromChoice(state.displayChoice, 'supportsWeather');
+}
+
+function weatherWindowForDisplayTZ(){
+  const today = DateTime.now().setZone(state.displayTZ).startOf('day');
+  return {
+    startISO: today.minus({ days: WEATHER.pastDays }).toISODate(),
+    endISO: today.plus({ days: WEATHER.futureDays }).toISODate()
+  };
+}
+*/
+
+function weatherIconForCode(code){
+  const n = Number(code);
+
+  if(n === 0) return '☀';
+  if(n === 1 || n === 2) return '⛅';
+  if(n === 3) return '☁';
+  if(n === 45 || n === 48) return '🌫';
+  if([51,53,55,56,57].includes(n)) return '🌦';
+  if([61,63,65,66,67].includes(n)) return '🌧';
+  if([71,73,75,77].includes(n)) return '❄';
+  if([80,81,82].includes(n)) return '🌦';
+  if([85,86].includes(n)) return '🌨';
+  if([95,96,99].includes(n)) return '⛈';
+
+  return '•';
+}
+
+function weatherSummaryForCode(code){
+  const n = Number(code);
+
+  if(n === 0) return 'Clear';
+  if(n === 1) return 'Mainly clear';
+  if(n === 2) return 'Partly cloudy';
+  if(n === 3) return 'Overcast';
+  if(n === 45 || n === 48) return 'Fog';
+  if([51,53,55].includes(n)) return 'Drizzle';
+  if([56,57].includes(n)) return 'Freezing drizzle';
+  if([61,63,65].includes(n)) return 'Rain';
+  if([66,67].includes(n)) return 'Freezing rain';
+  if([71,73,75,77].includes(n)) return 'Snow';
+  if([80,81,82].includes(n)) return 'Rain showers';
+  if([85,86].includes(n)) return 'Snow showers';
+  if([95,96,99].includes(n)) return 'Thunderstorm';
+
+  return 'Weather';
+}
+
+function formatWeatherTemp(v){
+  return Number.isFinite(v) ? `${Math.round(v)}°` : '—';
+}
+
+function weatherTitleForEntry(entry){
+  if(!entry) return '';
+
+  const bits = [entry.summary];
+
+  if(Number.isFinite(entry.tempMax)) bits.push(`Max ${Math.round(entry.tempMax)}°`);
+  if(Number.isFinite(entry.tempMin)) bits.push(`Min ${Math.round(entry.tempMin)}°`);
+  if(Number.isFinite(entry.precipitationSum)) bits.push(`Rain ${entry.precipitationSum} mm`);
+
+  return bits.join(' • ');
+}
+
+function weatherSourceUrlForDisplayTZ(){
+  const loc = weatherLocationForDisplayTZ();
+  if(!loc) return '';
+
+  const params = new URLSearchParams({
+    latitude: String(loc.latitude),
+    longitude: String(loc.longitude),
+    timezone: state.displayTZ,
+    past_days: String(WEATHER.pastDays),
+    forecast_days: String(WEATHER.futureDays + 1),
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum'
+  });
+
+  return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+}
+
+async function refreshWeatherCache(force = false){
+  const loc = weatherLocationForDisplayTZ();
+  const window = weatherWindowForDisplayTZ();
+
+  const unsupportedKey = `unsupported|${state.displayTZ}|${window.startISO}|${window.endISO}`;
+
+  if(!loc){
+    state.data.weather = {
+      cacheKey: unsupportedKey,
+      zone: state.displayTZ,
+      location: null,
+      startISO: window.startISO,
+      endISO: window.endISO,
+      byDate: new Map(),
+      unsupported: true,
+      error: null,
+      fetchedAt: DateTime.now().toISO()
+    };
+    return;
+  }
+
+  const cacheKey = [
+    state.displayTZ,
+    loc.latitude,
+    loc.longitude,
+    window.startISO,
+    window.endISO
+  ].join('|');
+
+  const existing = state.data.weather;
+  if(
+    !force &&
+    existing &&
+    existing.cacheKey === cacheKey &&
+    existing.byDate instanceof Map
+  ){
+    return;
+  }
+
+  state.data.weatherPendingKey = cacheKey;
+
+  try{
+    const params = new URLSearchParams({
+      latitude: String(loc.latitude),
+      longitude: String(loc.longitude),
+      timezone: state.displayTZ,
+      past_days: String(WEATHER.pastDays),
+      forecast_days: String(WEATHER.futureDays + 1),
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum'
+    });
+
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+      cache: 'no-store'
+    });
+
+    if(!res.ok){
+      throw new Error(`Weather request failed (${res.status})`);
+    }
+
+    const json = await res.json();
+
+    if(state.data.weatherPendingKey !== cacheKey) return;
+
+    const daily = json?.daily || {};
+    const dates = Array.isArray(daily.time) ? daily.time : [];
+    const byDate = new Map();
+
+    for(let i = 0; i < dates.length; i++){
+      const dateISO = dates[i];
+      const weatherCode = Number(daily.weather_code?.[i] ?? NaN);
+
+      const tempMax = Number.isFinite(Number(daily.temperature_2m_max?.[i]))
+        ? Number(daily.temperature_2m_max[i])
+        : null;
+
+      const tempMin = Number.isFinite(Number(daily.temperature_2m_min?.[i]))
+        ? Number(daily.temperature_2m_min[i])
+        : null;
+
+      const precipitationSum = Number.isFinite(Number(daily.precipitation_sum?.[i]))
+        ? Number(daily.precipitation_sum[i])
+        : null;
+
+      byDate.set(dateISO, {
+        dateISO,
+        locationLabel: loc.label,
+        weatherCode,
+        icon: weatherIconForCode(weatherCode),
+        summary: weatherSummaryForCode(weatherCode),
+        tempMax,
+        tempMin,
+        precipitationSum
+      });
+    }
+
+    state.data.weather = {
+      cacheKey,
+      zone: state.displayTZ,
+      location: loc,
+      startISO: window.startISO,
+      endISO: window.endISO,
+      byDate,
+      unsupported: false,
+      error: null,
+      fetchedAt: DateTime.now().toISO()
+    };
+  }catch(err){
+    if(state.data.weatherPendingKey !== cacheKey) return;
+
+    state.data.weather = {
+      cacheKey,
+      zone: state.displayTZ,
+      location: loc,
+      startISO: window.startISO,
+      endISO: window.endISO,
+      byDate: new Map(),
+      unsupported: false,
+      error: String(err?.message || err || 'Unknown weather error'),
+      fetchedAt: DateTime.now().toISO()
+    };
+  }
+
+  if(state.snapshot?.dateISO){
+    snapshotDay(state.snapshot.dateISO);
+  }else{
+    render();
+  }
+}
+
+function weatherForDate(dateISO){
+  const weather = state.data.weather;
+  if(!weather) return null;
+  if(weather.zone !== state.displayTZ) return null;
+  return weather.byDate?.get(dateISO) || null;
+}
+
+function buildWeatherMarkerEl(dateISO, opts = {}){
+  const entry = weatherForDate(dateISO);
+  if(!entry) return null;
+
+  const compact = opts.compact !== false;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'weather-markers';
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = 'center';
+  wrap.style.gap = '4px';
+  wrap.style.marginTop = '2px';
+  wrap.style.lineHeight = '1';
+
+  const marker = document.createElement('span');
+  marker.className = 'weather-marker';
+  marker.textContent = entry.icon;
+  marker.title = weatherTitleForEntry(entry);
+  marker.setAttribute('aria-label', weatherTitleForEntry(entry));
+  marker.style.fontSize = compact ? '12px' : '14px';
+  wrap.appendChild(marker);
+
+  if(!compact){
+    const txt = document.createElement('span');
+    txt.textContent = `${formatWeatherTemp(entry.tempMax)}/${formatWeatherTemp(entry.tempMin)}`;
+    txt.style.fontSize = '11px';
+    txt.style.color = 'var(--muted)';
+    txt.title = weatherTitleForEntry(entry);
+    wrap.appendChild(txt);
+  }
+
+  return wrap;
 }
 
 // ---------- Utilities ----------
@@ -497,259 +954,6 @@ function lunarPhasesForDate(dateISO){
     buildLunarPhaseCache();
   }
   return state.data.lunarPhases?.byDate?.get(dateISO) || [];
-}
-
-/* ------------- weather functions --------------- */
-
-function weatherLocationForDisplayTZ(){
-  return locationFromChoice(state.displayChoice, 'supportsWeather');
-}
-
-function weatherWindowForDisplayTZ(){
-  const today = DateTime.now().setZone(state.displayTZ).startOf('day');
-  return {
-    startISO: today.minus({ days: WEATHER.pastDays }).toISODate(),
-    endISO: today.plus({ days: WEATHER.futureDays }).toISODate()
-  };
-}
-
-function weatherIconForCode(code){
-  const n = Number(code);
-
-  if(n === 0) return '☀';
-  if(n === 1 || n === 2) return '⛅';
-  if(n === 3) return '☁';
-  if(n === 45 || n === 48) return '🌫';
-  if([51,53,55,56,57].includes(n)) return '🌦';
-  if([61,63,65,66,67].includes(n)) return '🌧';
-  if([71,73,75,77].includes(n)) return '❄';
-  if([80,81,82].includes(n)) return '🌦';
-  if([85,86].includes(n)) return '🌨';
-  if([95,96,99].includes(n)) return '⛈';
-
-  return '•';
-}
-
-function weatherSummaryForCode(code){
-  const n = Number(code);
-
-  if(n === 0) return 'Clear';
-  if(n === 1) return 'Mainly clear';
-  if(n === 2) return 'Partly cloudy';
-  if(n === 3) return 'Overcast';
-  if(n === 45 || n === 48) return 'Fog';
-  if([51,53,55].includes(n)) return 'Drizzle';
-  if([56,57].includes(n)) return 'Freezing drizzle';
-  if([61,63,65].includes(n)) return 'Rain';
-  if([66,67].includes(n)) return 'Freezing rain';
-  if([71,73,75,77].includes(n)) return 'Snow';
-  if([80,81,82].includes(n)) return 'Rain showers';
-  if([85,86].includes(n)) return 'Snow showers';
-  if([95,96,99].includes(n)) return 'Thunderstorm';
-
-  return 'Weather';
-}
-
-function formatWeatherTemp(v){
-  return Number.isFinite(v) ? `${Math.round(v)}°` : '—';
-}
-
-function weatherTitleForEntry(entry){
-  if(!entry) return '';
-
-  const bits = [entry.summary];
-
-  if(Number.isFinite(entry.tempMax)) bits.push(`Max ${Math.round(entry.tempMax)}°`);
-  if(Number.isFinite(entry.tempMin)) bits.push(`Min ${Math.round(entry.tempMin)}°`);
-  if(Number.isFinite(entry.precipitationSum)) bits.push(`Rain ${entry.precipitationSum} mm`);
-
-  return bits.join(' • ');
-}
-
-function weatherSourceUrlForDisplayTZ(){
-  const loc = weatherLocationForDisplayTZ();
-  if(!loc) return '';
-
-  const params = new URLSearchParams({
-    latitude: String(loc.latitude),
-    longitude: String(loc.longitude),
-    timezone: state.displayTZ,
-    past_days: String(WEATHER.pastDays),
-    forecast_days: String(WEATHER.futureDays + 1),
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum'
-  });
-
-  return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
-}
-
-async function refreshWeatherCache(force = false){
-  const loc = weatherLocationForDisplayTZ();
-  const window = weatherWindowForDisplayTZ();
-
-  const unsupportedKey = `unsupported|${state.displayTZ}|${window.startISO}|${window.endISO}`;
-
-  if(!loc){
-    state.data.weather = {
-      cacheKey: unsupportedKey,
-      zone: state.displayTZ,
-      location: null,
-      startISO: window.startISO,
-      endISO: window.endISO,
-      byDate: new Map(),
-      unsupported: true,
-      error: null,
-      fetchedAt: DateTime.now().toISO()
-    };
-    return;
-  }
-
-  const cacheKey = [
-    state.displayTZ,
-    loc.latitude,
-    loc.longitude,
-    window.startISO,
-    window.endISO
-  ].join('|');
-
-  const existing = state.data.weather;
-  if(
-    !force &&
-    existing &&
-    existing.cacheKey === cacheKey &&
-    existing.byDate instanceof Map
-  ){
-    return;
-  }
-
-  state.data.weatherPendingKey = cacheKey;
-
-  try{
-    const params = new URLSearchParams({
-      latitude: String(loc.latitude),
-      longitude: String(loc.longitude),
-      timezone: state.displayTZ,
-      past_days: String(WEATHER.pastDays),
-      forecast_days: String(WEATHER.futureDays + 1),
-      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum'
-    });
-
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-      cache: 'no-store'
-    });
-
-    if(!res.ok){
-      throw new Error(`Weather request failed (${res.status})`);
-    }
-
-    const json = await res.json();
-
-    if(state.data.weatherPendingKey !== cacheKey) return;
-
-    const daily = json?.daily || {};
-    const dates = Array.isArray(daily.time) ? daily.time : [];
-    const byDate = new Map();
-
-    for(let i = 0; i < dates.length; i++){
-      const dateISO = dates[i];
-      const weatherCode = Number(daily.weather_code?.[i] ?? NaN);
-
-      const tempMax = Number.isFinite(Number(daily.temperature_2m_max?.[i]))
-        ? Number(daily.temperature_2m_max[i])
-        : null;
-
-      const tempMin = Number.isFinite(Number(daily.temperature_2m_min?.[i]))
-        ? Number(daily.temperature_2m_min[i])
-        : null;
-
-      const precipitationSum = Number.isFinite(Number(daily.precipitation_sum?.[i]))
-        ? Number(daily.precipitation_sum[i])
-        : null;
-
-      byDate.set(dateISO, {
-        dateISO,
-        locationLabel: loc.label,
-        weatherCode,
-        icon: weatherIconForCode(weatherCode),
-        summary: weatherSummaryForCode(weatherCode),
-        tempMax,
-        tempMin,
-        precipitationSum
-      });
-    }
-
-    state.data.weather = {
-      cacheKey,
-      zone: state.displayTZ,
-      location: loc,
-      startISO: window.startISO,
-      endISO: window.endISO,
-      byDate,
-      unsupported: false,
-      error: null,
-      fetchedAt: DateTime.now().toISO()
-    };
-  }catch(err){
-    if(state.data.weatherPendingKey !== cacheKey) return;
-
-    state.data.weather = {
-      cacheKey,
-      zone: state.displayTZ,
-      location: loc,
-      startISO: window.startISO,
-      endISO: window.endISO,
-      byDate: new Map(),
-      unsupported: false,
-      error: String(err?.message || err || 'Unknown weather error'),
-      fetchedAt: DateTime.now().toISO()
-    };
-  }
-
-  if(state.snapshot?.dateISO){
-    snapshotDay(state.snapshot.dateISO);
-  }else{
-    render();
-  }
-}
-
-function weatherForDate(dateISO){
-  const weather = state.data.weather;
-  if(!weather) return null;
-  if(weather.zone !== state.displayTZ) return null;
-  return weather.byDate?.get(dateISO) || null;
-}
-
-function buildWeatherMarkerEl(dateISO, opts = {}){
-  const entry = weatherForDate(dateISO);
-  if(!entry) return null;
-
-  const compact = opts.compact !== false;
-
-  const wrap = document.createElement('div');
-  wrap.className = 'weather-markers';
-  wrap.style.display = 'flex';
-  wrap.style.alignItems = 'center';
-  wrap.style.gap = '4px';
-  wrap.style.marginTop = '2px';
-  wrap.style.lineHeight = '1';
-
-  const marker = document.createElement('span');
-  marker.className = 'weather-marker';
-  marker.textContent = entry.icon;
-  marker.title = weatherTitleForEntry(entry);
-  marker.setAttribute('aria-label', weatherTitleForEntry(entry));
-  marker.style.fontSize = compact ? '12px' : '14px';
-  wrap.appendChild(marker);
-
-  if(!compact){
-    const txt = document.createElement('span');
-    txt.textContent = `${formatWeatherTemp(entry.tempMax)}/${formatWeatherTemp(entry.tempMin)}`;
-    txt.style.fontSize = '11px';
-    txt.style.color = 'var(--muted)';
-    txt.title = weatherTitleForEntry(entry);
-    wrap.appendChild(txt);
-  }
-
-  return wrap;
 }
 
 // ---------- Data: SuperMonth ranges ----------
@@ -1165,62 +1369,6 @@ function attachFridayFlowerPreview(imgEl){
       showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
     }
   });
-}
-
-function setUpTZList(){
-  const helpers = locationHelpers();
-  if(!helpers?.getHybridOptionsFor) return;
-
-  const options = helpers.getHybridOptionsFor('supportsAFdS', {
-    includeAllIana: true,
-    includeUTC: true
-  });
-
-  function fillHybridSelect(sel, currentChoice, fallbackChoice){
-    if(!sel) return;
-    sel.innerHTML = '';
-
-    const locGroup = document.createElement('optgroup');
-    locGroup.label = 'Locations';
-
-    for(const item of options.locations){
-      const opt = document.createElement('option');
-      opt.value = item.value;
-      opt.textContent = item.label;
-      locGroup.appendChild(opt);
-    }
-
-    const tzGroup = document.createElement('optgroup');
-    tzGroup.label = 'Time zones';
-
-    for(const item of options.timezones){
-      const opt = document.createElement('option');
-      opt.value = item.value;
-      opt.textContent = item.label;
-      tzGroup.appendChild(opt);
-    }
-
-    sel.appendChild(locGroup);
-    sel.appendChild(tzGroup);
-
-    const allValues = new Set([
-      ...options.locations.map(x => x.value),
-      ...options.timezones.map(x => x.value)
-    ]);
-
-    const chosen = allValues.has(currentChoice) ? currentChoice : fallbackChoice;
-    sel.value = allValues.has(chosen) ? chosen : '';
-  }
-
-  fillHybridSelect(el('tzTamara'), state.tamaraChoice, DEFAULTS.tamaraChoice);
-  fillHybridSelect(el('tzMartin'), state.martinChoice, DEFAULTS.martinChoice);
-  fillHybridSelect(el('displayTZ'), state.displayChoice, DEFAULTS.displayChoice);
-
-  state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
-  state.martinTZ = timezoneFromChoice(state.martinChoice, 'Australia/Brisbane');
-  state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
-
-  ensureEastWestOrder();
 }
 
 function render(){
@@ -2952,26 +3100,6 @@ function updateAnalog(hostId, dt){
   rotate(s, second * 6);
 }
 
-function ensureEastWestOrder(){
-  const now = DateTime.now();
-  const a = now.setZone(state.tamaraTZ);
-  const b = now.setZone(state.martinTZ);
-
-  if(a.offset === b.offset) return;
-
-  if(a.offset < b.offset){
-    [state.tamaraTZ, state.martinTZ] = [state.martinTZ, state.tamaraTZ];
-    [state.tamaraChoice, state.martinChoice] = [state.martinChoice, state.tamaraChoice];
-
-    const iA = el('tzTamara');
-    const iB = el('tzMartin');
-    if(iA && iB){
-      iA.value = state.tamaraChoice;
-      iB.value = state.martinChoice;
-    }
-  }
-}
-
 // ---------- Controls ----------
 function bindControls(){
   el('viewSelect').addEventListener('change', (e)=>{
@@ -3010,10 +3138,10 @@ function bindControls(){
       const seo = canonicalSeoianDate(state.focusDateISO);
       if(seo.canonical){
         let y = seo.year;
-        let m = seo.canonical.monthNo + 1;
-        if(m > 13){ m = 1; y = y + 1; }
-        const r = getRangeForMonth(y, m);
-        if(r){ state.focusDateISO = r.start; render(); return; }
+          let m = seo.canonical.monthNo + 1;
+          if(m > 13){ m = 1; y = y + 1; }
+          const r = getRangeForMonth(y, m);
+          if(r){ state.focusDateISO = r.start; render(); return; }
       }
     }
 
@@ -3025,6 +3153,57 @@ function bindControls(){
 
   el('toggleGregorian').addEventListener('change', ()=> render());
 
+  function applyZoneChoice(which, value){
+    if(which === 'display'){
+      state.displayChoice = value || DEFAULTS.displayChoice;
+    }else if(which === 'tamara'){
+      state.tamaraChoice = value || DEFAULTS.tamaraChoice;
+    }else if(which === 'martin'){
+      state.martinChoice = value || DEFAULTS.martinChoice;
+    }
+
+    syncTZStateFromChoices();
+    ensureEastWestOrder();
+  }
+
+  el('displayTZ').addEventListener('change', (e)=>{
+    applyZoneChoice('display', e.target.value);
+    buildLunarPhaseCache();
+
+    if(state.snapshot?.dateISO){
+      snapshotDay(state.snapshot.dateISO);
+    }else{
+      render();
+    }
+
+    refreshWeatherCache();
+  });
+
+  el('tzTamara').addEventListener('change', (e)=>{
+    applyZoneChoice('tamara', e.target.value);
+
+    if(state.snapshot?.dateISO){
+      snapshotDay(state.snapshot.dateISO);
+    }else{
+      render();
+    }
+
+    tickClocks();
+  });
+
+  el('tzMartin').addEventListener('change', (e)=>{
+    applyZoneChoice('martin', e.target.value);
+
+    if(state.snapshot?.dateISO){
+      snapshotDay(state.snapshot.dateISO);
+    }else{
+      render();
+    }
+
+    tickClocks();
+  });
+
+  /*
   el('displayTZ').addEventListener('change', (e)=>{
     state.displayChoice = e.target.value || DEFAULTS.displayChoice;
     state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
@@ -3039,6 +3218,7 @@ function bindControls(){
 
     refreshWeatherCache();
   });
+  */
 
   el('btnFilters').addEventListener('click', ()=>{
     const dd = el('filtersDropdown');
@@ -3112,6 +3292,7 @@ function bindControls(){
     render();
   });
 
+  /*
   el('tzTamara').addEventListener('change', (e)=>{
     state.tamaraChoice = e.target.value || DEFAULTS.tamaraChoice;
     state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
@@ -3139,6 +3320,7 @@ function bindControls(){
 
     tickClocks();
   });
+  */
 
   const sheet = el('bottomSheet');
   el('sheetHandle').addEventListener('click', ()=>{
