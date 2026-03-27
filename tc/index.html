@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge | ABHLSD Exercise Log" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn backbtn" href="../index.html" aria-label="Back to ABHLSD.net">← Back to ABHLSD.net</a>
+      </div>
+
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">Exercise log • Body metrics • Notes</div>
+      </div>
+
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel left">
+        <div class="panel-inner stack">
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Exercise entry</div>
+                <div class="section-subtitle">Quick manual entry, without commercial-app nonsense.</div>
+              </div>
+            </div>
+
+            <form id="exerciseForm" class="form-grid">
+              <label>
+                <span>Date</span>
+                <input id="exerciseDate" type="date" required />
+              </label>
+
+              <label>
+                <span>User</span>
+                <select id="exerciseUser"></select>
+              </label>
+
+              <label class="span-2">
+                <span>Exercise</span>
+                <select id="exerciseSelect"></select>
+              </label>
+
+              <label id="customExerciseWrap" class="span-2 hidden">
+                <span>Custom exercise name</span>
+                <input id="customExerciseName" type="text" placeholder="Enter exercise name" />
+              </label>
+
+              <div class="meta-note span-2" id="exerciseMeta">Choose an exercise to show category and notes.</div>
+
+              <label>
+                <span>Sets</span>
+                <input id="sets" type="number" min="0" step="1" placeholder="e.g. 2" />
+              </label>
+
+              <label>
+                <span>Reps</span>
+                <input id="reps" type="number" min="0" step="1" placeholder="e.g. 20" />
+              </label>
+
+              <label>
+                <span>Weight</span>
+                <div class="split-input">
+                  <input id="weight" type="number" min="0" step="0.1" placeholder="e.g. 3" />
+                  <select id="weightUnit">
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                  </select>
+                </div>
+              </label>
+
+              <label>
+                <span>Duration</span>
+                <div class="split-input">
+                  <input id="duration" type="number" min="0" step="0.1" placeholder="e.g. 15" />
+                  <span class="unit-pill">min</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Distance</span>
+                <div class="split-input">
+                  <input id="distance" type="number" min="0" step="0.01" placeholder="e.g. 2.5" />
+                  <span class="unit-pill">km</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Resistance</span>
+                <input id="resistance" type="text" placeholder="e.g. moderate / level 4" />
+              </label>
+
+              <label>
+                <span>Side / limb</span>
+                <select id="side">
+                  <option value="">Not specified</option>
+                  <option value="both">Both</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="alternating">Alternating</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Effort</span>
+                <select id="effort">
+                  <option value="">Not specified</option>
+                  <option value="easy">Easy</option>
+                  <option value="steady">Steady</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Joint pain?</span>
+                <select id="jointPain">
+                  <option value="">Not specified</option>
+                  <option value="no">No</option>
+                  <option value="mild">Mild</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="strong">Strong</option>
+                </select>
+              </label>
+
+              <label class="span-2">
+                <span>Notes</span>
+                <textarea id="exerciseNotes" rows="3" placeholder="e.g. left shoulder felt fine, muscle discomfort only"></textarea>
+              </label>
+
+              <div class="form-actions span-2">
+                <button class="btn" type="submit">Add exercise entry</button>
+                <button class="btn btn-ghost" type="button" id="resetExerciseForm">Reset</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Body metric</div>
+                <div class="section-subtitle">Weight and other personal markers can live here.</div>
+              </div>
+            </div>
+
+            <form id="metricForm" class="form-grid compact-grid">
+              <label>
+                <span>Date</span>
+                <input id="metricDate" type="date" required />
+              </label>
+
+              <label>
+                <span>User</span>
+                <select id="metricUser"></select>
+              </label>
+
+              <label>
+                <span>Weight</span>
+                <div class="split-input">
+                  <input id="bodyWeight" type="number" min="0" step="0.1" placeholder="e.g. 86.9" />
+                  <span class="unit-pill">kg</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Waist</span>
+                <div class="split-input">
+                  <input id="waist" type="number" min="0" step="0.1" placeholder="optional" />
+                  <span class="unit-pill">cm</span>
+                </div>
+              </label>
+
+              <label class="span-2">
+                <span>Notes</span>
+                <textarea id="metricNotes" rows="2" placeholder="e.g. home scales may weigh light"></textarea>
+              </label>
+
+              <div class="form-actions span-2">
+                <button class="btn" type="submit">Add body metric</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Daily note</div>
+                <div class="section-subtitle">For recovery, sleep, shoulder response, or anything else that matters.</div>
+              </div>
+            </div>
+
+            <form id="noteForm" class="form-grid compact-grid">
+              <label>
+                <span>Date</span>
+                <input id="noteDate" type="date" required />
+              </label>
+
+              <label>
+                <span>User</span>
+                <select id="noteUser"></select>
+              </label>
+
+              <label class="span-2">
+                <span>Title</span>
+                <input id="noteTitle" type="text" placeholder="e.g. Shoulder response" />
+              </label>
+
+              <label class="span-2">
+                <span>Note</span>
+                <textarea id="noteText" rows="3" placeholder="e.g. shoulder felt good after yesterday's exercise"></textarea>
+              </label>
+
+              <div class="form-actions span-2">
+                <button class="btn" type="submit">Add note</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </aside>
+
+      <section class="center">
+        <div class="surface-header">
+          <div class="nav">
+            <button class="btn" id="btnToday" type="button">Today</button>
+            <button class="iconbtn" id="btnPrevDay" type="button" aria-label="Previous day">‹</button>
+            <button class="iconbtn" id="btnNextDay" type="button" aria-label="Next day">›</button>
+            <div class="title-block">
+              <div class="title" id="historyTitle">Exercise history</div>
+              <div class="subtitle" id="historySubtitle">Review what happened, not what an app wishes you had meant.</div>
+            </div>
+          </div>
+
+          <div class="controls">
+            <label class="control">
+              <span>Focus date</span>
+              <input id="focusDate" type="date" />
+            </label>
+
+            <label class="control">
+              <span>User</span>
+              <select id="filterUser"></select>
+            </label>
+
+            <label class="control">
+              <span>View</span>
+              <select id="viewMode">
+                <option value="day">Selected day</option>
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+                <option value="all">All history</option>
+              </select>
+            </label>
+
+            <label class="control">
+              <span>Exercise filter</span>
+              <select id="filterExercise"></select>
+            </label>
+          </div>
+        </div>
+
+        <div class="surface history-surface">
+          <section class="section-card summary-strip" id="daySummaryCard">
+            <div class="summary-grid" id="daySummary"></div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">History</div>
+                <div class="section-subtitle">Grouped by day, with exercises, body metrics, and notes together.</div>
+              </div>
+            </div>
+            <div id="historyList" class="history-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="panel right">
+        <div class="panel-inner stack">
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Range summary</div>
+                <div class="section-subtitle">A first pass at useful signals.</div>
+              </div>
+            </div>
+            <div class="facts" id="rangeFacts"></div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Exercise catalogue</div>
+                <div class="section-subtitle">Starter list, ready to grow.</div>
+              </div>
+            </div>
+            <div class="catalogue-list" id="catalogueList"></div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div>
+                <div class="section-title">Storage & backup</div>
+                <div class="section-subtitle">For now this draft stores data in your browser.</div>
+              </div>
+            </div>
+
+            <div class="facts" id="storageFacts"></div>
+
+            <div class="button-stack">
+              <button class="btn" id="exportData" type="button">Export data (.json)</button>
+              <label class="btn btn-ghost file-btn" for="importDataInput">Import data (.json)</label>
+              <input id="importDataInput" type="file" accept="application/json" hidden />
+              <button class="btn btn-ghost danger" id="resetSeedData" type="button">Restore starter data</button>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
