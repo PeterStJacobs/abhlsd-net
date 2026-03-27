@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge Entry | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge entry page for fast mobile exercise logging" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-ghost" href="../index.html" aria-label="Back to ABHLSD.net">← Back</a>
+      </div>
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">Entry</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="page compact stack">
+      <nav class="navtabs" aria-label="The Challenge pages">
+        <a class="navtab active" href="./entry.html">Entry</a>
+        <a class="navtab" href="./history.html">History</a>
+      </nav>
+
+      <section class="entry-layout">
+        <div class="stack">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Session setup</div>
+                <div class="card-subtitle">Keep this light. Choose the person and log the day.</div>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div>
+                <div class="inline-label">Active person</div>
+                <div class="person-strip" id="personStrip"></div>
+              </div>
+
+              <div class="form-grid two-col">
+                <label>
+                  <span>Date</span>
+                  <input id="sessionDate" type="date" />
+                </label>
+
+                <div>
+                  <div class="inline-label">Music jump</div>
+                  <div class="music-strip">
+                    <a class="music-btn" href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer">Open Spotify</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Quick exercise picks</div>
+                <div class="card-subtitle">Tap once to load a common exercise into the form below.</div>
+              </div>
+            </div>
+            <div class="quick-grid" id="quickGrid"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Exercise entry</div>
+                <div class="card-subtitle">Fast enough to use between sets.</div>
+              </div>
+            </div>
+
+            <form id="exerciseForm" class="form-grid two-col">
+              <label>
+                <span>Exercise</span>
+                <select id="exerciseSelect"></select>
+              </label>
+
+              <label id="customExerciseWrap" class="hidden">
+                <span>Custom exercise name</span>
+                <input id="customExerciseName" type="text" placeholder="Enter exercise name" />
+              </label>
+
+              <div class="meta-note span-2" id="exerciseMeta">Choose an exercise to see category and notes.</div>
+
+              <div class="timer-panel span-2">
+                <div class="timer-main">
+                  <div class="timer-readout">
+                    <div class="timer-caption">Exercise timer</div>
+                    <div class="timer-clock" id="timerClock">00:00</div>
+                    <div class="timer-caption" id="timerCaption">Start the timer, do the work, stop it, and the duration will drop into the form.</div>
+                  </div>
+                  <div class="timer-actions">
+                    <button class="start-stop" id="timerToggle" type="button">Start</button>
+                    <button class="btn-ghost" id="timerClear" type="button">Clear</button>
+                  </div>
+                </div>
+                <div class="split-input">
+                  <input id="durationMin" type="number" min="0" step="0.1" placeholder="Duration in minutes" />
+                  <span class="unit-pill">min</span>
+                </div>
+              </div>
+
+              <label>
+                <span>Sets</span>
+                <input id="sets" type="number" min="0" step="1" placeholder="e.g. 2" />
+              </label>
+
+              <label>
+                <span>Reps</span>
+                <input id="reps" type="number" min="0" step="1" placeholder="e.g. 20" />
+              </label>
+
+              <label>
+                <span>Weight</span>
+                <div class="split-input">
+                  <input id="weight" type="number" min="0" step="0.1" placeholder="e.g. 3" />
+                  <select id="weightUnit">
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                  </select>
+                </div>
+              </label>
+
+              <label>
+                <span>Distance</span>
+                <div class="split-input">
+                  <input id="distanceKm" type="number" min="0" step="0.01" placeholder="e.g. 2.5" />
+                  <span class="unit-pill">km</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Resistance</span>
+                <input id="resistance" type="text" placeholder="e.g. moderate / level 4" />
+              </label>
+
+              <label>
+                <span>Side / limb</span>
+                <select id="side">
+                  <option value="">Not specified</option>
+                  <option value="both">Both</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="alternating">Alternating</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Effort</span>
+                <select id="effort">
+                  <option value="">Not specified</option>
+                  <option value="easy">Easy</option>
+                  <option value="steady">Steady</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Joint pain</span>
+                <select id="jointPain">
+                  <option value="">Not specified</option>
+                  <option value="no">No</option>
+                  <option value="mild">Mild</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="strong">Strong</option>
+                </select>
+              </label>
+
+              <label class="span-2">
+                <span>Notes</span>
+                <textarea id="exerciseNotes" placeholder="e.g. left shoulder felt fine, muscle discomfort only"></textarea>
+              </label>
+
+              <div class="sticky-actions span-2">
+                <div class="form-actions">
+                  <button class="btn" type="submit">Save exercise entry</button>
+                  <button class="btn-ghost" id="resetExerciseForm" type="button">Reset</button>
+                </div>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Body metrics</div>
+                <div class="card-subtitle">Useful context, without turning the page into a tape-measure tribunal.</div>
+              </div>
+            </div>
+
+            <form id="metricForm" class="form-grid two-col">
+              <label>
+                <span>Body weight</span>
+                <div class="split-input">
+                  <input id="bodyWeightKg" type="number" min="0" step="0.1" placeholder="e.g. 86.9" />
+                  <span class="unit-pill">kg</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Sleep</span>
+                <div class="split-input">
+                  <input id="sleepHours" type="number" min="0" step="0.1" placeholder="e.g. 6.5" />
+                  <span class="unit-pill">hrs</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Systolic BP</span>
+                <input id="systolic" type="number" min="0" step="1" placeholder="e.g. 118" />
+              </label>
+
+              <label>
+                <span>Diastolic BP</span>
+                <input id="diastolic" type="number" min="0" step="1" placeholder="e.g. 80" />
+              </label>
+
+              <label>
+                <span>Pulse</span>
+                <div class="split-input">
+                  <input id="pulseBpm" type="number" min="0" step="1" placeholder="e.g. 75" />
+                  <span class="unit-pill">bpm</span>
+                </div>
+              </label>
+
+              <label>
+                <span>Energy</span>
+                <select id="energy">
+                  <option value="">Not specified</option>
+                  <option value="low">Low</option>
+                  <option value="flat">Flat</option>
+                  <option value="steady">Steady</option>
+                  <option value="good">Good</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Soreness / pain</span>
+                <select id="soreness">
+                  <option value="">Not specified</option>
+                  <option value="none">None</option>
+                  <option value="light">Light</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="strong">Strong</option>
+                </select>
+              </label>
+
+              <div></div>
+
+              <label class="span-2">
+                <span>Notes</span>
+                <textarea id="metricNotes" placeholder="e.g. poor sleep, shoulder stiff on waking, home scales may read light"></textarea>
+              </label>
+
+              <div class="form-actions span-2">
+                <button class="btn" type="submit">Save body metric</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Session note</div>
+                <div class="card-subtitle">For recovery, mood, shoulder response, or anything else worth remembering.</div>
+              </div>
+            </div>
+
+            <form id="noteForm" class="form-grid two-col">
+              <label class="span-2">
+                <span>Title</span>
+                <input id="noteTitle" type="text" placeholder="e.g. Shoulder response" />
+              </label>
+
+              <label class="span-2">
+                <span>Note</span>
+                <textarea id="noteBody" placeholder="Write the day’s useful truth here."></textarea>
+              </label>
+
+              <div class="form-actions span-2">
+                <button class="btn" type="submit">Save session note</button>
+              </div>
+            </form>
+          </article>
+        </div>
+
+        <div class="side-stack stack">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Today so far</div>
+                <div class="card-subtitle">A clean running snapshot of the current day.</div>
+              </div>
+            </div>
+            <section class="stats-grid" id="todayStats"></section>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Recent exercise entries</div>
+                <div class="card-subtitle">The latest records for the selected person and day.</div>
+              </div>
+            </div>
+            <div class="today-list" id="todayExerciseList"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Metrics and notes today</div>
+                <div class="card-subtitle">Context, not clutter.</div>
+              </div>
+            </div>
+            <div class="compact-list" id="todayContextList"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./entry.js"></script>
+</body>
+</html>

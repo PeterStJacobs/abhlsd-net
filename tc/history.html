@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge History | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge history page for exercise records, metrics, and notes" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-ghost" href="../index.html" aria-label="Back to ABHLSD.net">← Back</a>
+      </div>
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">History</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="page compact stack">
+      <nav class="navtabs" aria-label="The Challenge pages">
+        <a class="navtab" href="./entry.html">Entry</a>
+        <a class="navtab active" href="./history.html">History</a>
+      </nav>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">History filters</div>
+            <div class="card-subtitle">Review by person, period, exercise, and category.</div>
+          </div>
+        </div>
+
+        <div class="search-row">
+          <label>
+            <span>Exercise search</span>
+            <input id="searchText" type="text" placeholder="Search by exercise name or note" />
+          </label>
+
+          <label>
+            <span>Person</span>
+            <select id="filterUser"></select>
+          </label>
+
+          <label>
+            <span>Category</span>
+            <select id="filterCategory">
+              <option value="">All categories</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Exercise</span>
+            <select id="filterExercise">
+              <option value="">All exercises</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Start date</span>
+            <input id="filterStart" type="date" />
+          </label>
+
+          <label>
+            <span>End date</span>
+            <input id="filterEnd" type="date" />
+          </label>
+        </div>
+      </section>
+
+      <section class="stats-grid" id="historyStats"></section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">History timeline</div>
+            <div class="card-subtitle">Exercises, metrics, and notes grouped by day.</div>
+          </div>
+        </div>
+
+        <div class="timeline-grid" id="historyTimeline"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./history.js"></script>
+</body>
+</html>

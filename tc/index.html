@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge | mobile-friendly exercise entry and history for ABHLSD.net" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-ghost" href="../index.html" aria-label="Back to ABHLSD.net">← Back to ABHLSD.net</a>
+      </div>
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">Exercise entry • history • body metrics • notes</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="page compact stack">
+      <section class="hero">
+        <div class="hero-title">A practical exercise service, not a chirpy little gym toy.</div>
+        <div class="hero-copy">
+          The front door is built for mobile use during a session. Record now, review later, and let the analysis grow on its own page instead of clogging the entry flow.
+        </div>
+
+        <div class="navtabs">
+          <a class="navtab active" href="./entry.html">Open Entry</a>
+          <a class="navtab" href="./history.html">Open History</a>
+        </div>
+      </section>
+
+      <section class="stats-grid" id="snapshotCards"></section>
+
+      <section class="card-grid">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Today at a glance</div>
+              <div class="card-subtitle">A small snapshot of the current session state.</div>
+            </div>
+          </div>
+          <div class="today-list" id="todayBreakdown"></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Storage and backup</div>
+              <div class="card-subtitle">Still local for now, but easy to back up.</div>
+            </div>
+          </div>
+          <div class="export-row">
+            <button class="btn" id="exportBtn" type="button">Export JSON backup</button>
+            <label class="btn btn-ghost" for="importInput">Import JSON backup</label>
+            <input id="importInput" type="file" accept="application/json" class="hidden" />
+            <div class="footer-note">Data is stored in this browser for Draft V2. A private backend can come later without changing the page structure.</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./index.js"></script>
+</body>
+</html>
