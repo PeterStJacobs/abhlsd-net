@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge Entry | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge entry page for fast mobile exercise logging" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-ghost" href="../index.html" aria-label="Back to ABHLSD.net">← Back</a>
+      </div>
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">Entry</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="page compact stack">
+      <nav class="navtabs" aria-label="The Challenge pages">
+        <a class="navtab active" href="./entry.html">Entry</a>
+        <a class="navtab" href="./history.html">History</a>
+      </nav>
+
+      <section class="entry-layout">
+        <div class="stack">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Session setup</div>
+                <div class="card-subtitle">Choose the person, log the date, and keep music one tap away.</div>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div>
+                <div class="inline-label">Active person</div>
+                <div class="person-strip" id="personStrip"></div>
+              </div>
+
+              <div class="form-grid two-col">
+                <label>
+                  <span>Date</span>
+                  <input id="sessionDate" type="date" />
+                </label>
+
+                <div>
+                  <div class="inline-label">Music jump</div>
+                  <div class="music-strip">
+                    <a class="music-btn" href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer">Open Spotify</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Quick exercise picks</div>
+                <div class="card-subtitle">Tap once to load a common exercise into the form below.</div>
+              </div>
+            </div>
+            <div class="quick-grid" id="quickGrid"></div>
+            <div class="divider"></div>
+            <div class="inline-label">Recent exercise picks</div>
+            <div class="quick-grid" id="recentGrid"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Exercise entry</div>
+                <div class="card-subtitle">Fast enough to use during a session, with extra fields only when they matter.</div>
+              </div>
+            </div>
+
+            <form id="exerciseForm" class="form-grid two-col">
+              <label>
+                <span>Exercise</span>
+                <select id="exerciseSelect"></select>
+              </label>
+
+              <label>
+                <span>Record time</span>
+                <div class="split-input three-way">
+                  <input id="exerciseTime" type="time" />
+                  <button class="btn-ghost small-btn" id="exerciseNowBtn" type="button">Now</button>
+                </div>
+              </label>
+
+              <label id="customExerciseWrap" class="hidden">
+                <span>Custom exercise name</span>
+                <input id="customExerciseName" type="text" placeholder="Enter exercise name" />
+              </label>
+
+              <label id="customCategoryWrap" class="hidden">
+                <span>Custom category</span>
+                <select id="customCategory">
+                  <option value="strength">Strength</option>
+                  <option value="cardio">Cardio</option>
+                  <option value="mobility">Mobility</option>
+                  <option value="rehab">Rehab</option>
+                  <option value="core">Core</option>
+                </select>
+              </label>
+
+              <div class="meta-note span-2" id="exerciseMeta">Choose an exercise to see category and notes.</div>
+
+              <div class="timer-panel span-2">
+                <div class="timer-main">
+                  <div class="timer-readout">
+                    <div class="timer-caption">Exercise timer</div>
+                    <div class="timer-clock" id="timerClock">00:00</div>
+                    <div class="timer-caption" id="timerCaption">Start the timer, do the work, stop it, and the duration will drop into the form.</div>
+                  </div>
+                  <div class="timer-actions">
+                    <button class="start-stop" id="timerToggle" type="button">Start</button>
+                    <button class="btn-ghost" id="timerClear" type="button">Clear</button>
+                  </div>
+                </div>
+                <div class="split-input">
+                  <input id="durationMin" type="number" min="0" step="0.1" placeholder="Duration in minutes" />
+                  <span class="unit-pill">min</span>
+                </div>
+              </div>
+
+              <div class="field-group span-2">
+                <div class="group-title">General fields</div>
+                <div class="form-grid two-col nested-grid">
+                  <label>
+                    <span>Sets</span>
+                    <input id="sets" type="number" min="0" step="1" placeholder="e.g. 2" />
+                  </label>
+
+                  <label>
+                    <span>Reps</span>
+                    <input id="reps" type="number" min="0" step="1" placeholder="e.g. 20" />
+                  </label>
+
+                  <label>
+                    <span>Weight</span>
+                    <div class="split-input">
+                      <input id="weight" type="number" min="0" step="0.1" placeholder="e.g. 3" />
+                      <select id="weightUnit">
+                        <option value="kg">kg</option>
+                        <option value="lb">lb</option>
+                      </select>
+                    </div>
+                  </label>
+
+                  <label>
+                    <span>Distance</span>
+                    <div class="split-input">
+                      <input id="distanceKm" type="number" min="0" step="0.01" placeholder="e.g. 2.5" />
+                      <span class="unit-pill">km</span>
+                    </div>
+                  </label>
+
+                  <label>
+                    <span>Resistance</span>
+                    <input id="resistance" type="text" placeholder="e.g. moderate / level 4" />
+                  </label>
+
+                  <label>
+                    <span>Side / limb</span>
+                    <select id="side">
+                      <option value="">Not specified</option>
+                      <option value="both">Both</option>
+                      <option value="left">Left</option>
+                      <option value="right">Right</option>
+                      <option value="alternating">Alternating</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Effort</span>
+                    <select id="effort">
+                      <option value="">Not specified</option>
+                      <option value="easy">Easy</option>
+                      <option value="steady">Steady</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Joint pain</span>
+                    <select id="jointPain">
+                      <option value="">Not specified</option>
+                      <option value="no">No</option>
+                      <option value="mild">Mild</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="strong">Strong</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field-group span-2 hidden" id="bikeFields">
+                <div class="group-title">Bike / cycling fields</div>
+                <div class="form-grid two-col nested-grid">
+                  <label>
+                    <span>Average HR</span>
+                    <div class="split-input">
+                      <input id="avgHr" type="number" min="0" step="1" placeholder="e.g. 128" />
+                      <span class="unit-pill">bpm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Max HR</span>
+                    <div class="split-input">
+                      <input id="maxHr" type="number" min="0" step="1" placeholder="e.g. 146" />
+                      <span class="unit-pill">bpm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Workout calories</span>
+                    <div class="split-input">
+                      <input id="workoutCalories" type="number" min="0" step="1" placeholder="e.g. 220" />
+                      <span class="unit-pill">kcal</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field-group span-2 hidden" id="walkingFields">
+                <div class="group-title">Walking / treadmill fields</div>
+                <div class="form-grid two-col nested-grid">
+                  <label>
+                    <span>Average speed</span>
+                    <div class="split-input">
+                      <input id="avgSpeedKmh" type="number" min="0" step="0.1" placeholder="e.g. 5.4" />
+                      <span class="unit-pill">km/h</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Average HR</span>
+                    <div class="split-input">
+                      <input id="walkAvgHr" type="number" min="0" step="1" placeholder="e.g. 115" />
+                      <span class="unit-pill">bpm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Max HR</span>
+                    <div class="split-input">
+                      <input id="walkMaxHr" type="number" min="0" step="1" placeholder="e.g. 129" />
+                      <span class="unit-pill">bpm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Workout calories</span>
+                    <div class="split-input">
+                      <input id="walkCalories" type="number" min="0" step="1" placeholder="e.g. 160" />
+                      <span class="unit-pill">kcal</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Steps</span>
+                    <input id="exerciseSteps" type="number" min="0" step="1" placeholder="e.g. 4200" />
+                  </label>
+                  <label>
+                    <span>Average cadence</span>
+                    <div class="split-input">
+                      <input id="avgCadence" type="number" min="0" step="1" placeholder="e.g. 108" />
+                      <span class="unit-pill">spm</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field-group span-2 hidden" id="rowingFields">
+                <div class="group-title">Rowing fields</div>
+                <div class="form-grid two-col nested-grid">
+                  <label>
+                    <span>Average pace</span>
+                    <div class="split-input">
+                      <input id="avgPace500" type="text" placeholder="mm:ss.0" />
+                      <span class="unit-pill">/500m</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Average stroke rate</span>
+                    <div class="split-input">
+                      <input id="avgStrokeRate" type="number" min="0" step="1" placeholder="e.g. 22" />
+                      <span class="unit-pill">spm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Average HR</span>
+                    <div class="split-input">
+                      <input id="rowAvgHr" type="number" min="0" step="1" placeholder="e.g. 132" />
+                      <span class="unit-pill">bpm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Max HR</span>
+                    <div class="split-input">
+                      <input id="rowMaxHr" type="number" min="0" step="1" placeholder="e.g. 148" />
+                      <span class="unit-pill">bpm</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Average power</span>
+                    <div class="split-input">
+                      <input id="avgPower" type="number" min="0" step="1" placeholder="e.g. 122" />
+                      <span class="unit-pill">W</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <label class="span-2">
+                <span>Notes</span>
+                <textarea id="exerciseNotes" placeholder="e.g. left shoulder felt fine, muscle discomfort only"></textarea>
+              </label>
+
+              <div class="sticky-actions span-2">
+                <div class="form-actions">
+                  <button class="btn" type="submit">Save exercise entry</button>
+                  <button class="btn-ghost" id="resetExerciseForm" type="button">Reset</button>
+                </div>
+              </div>
+            </form>
+          </article>
+        </div>
+
+        <div class="stack side-stack">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Profile and targets</div>
+                <div class="card-subtitle">User-level data for BMI and daily step context.</div>
+              </div>
+            </div>
+
+            <form id="profileForm" class="form-grid">
+              <label>
+                <span>Height</span>
+                <div class="split-input">
+                  <input id="profileHeightCm" type="number" min="0" step="0.1" placeholder="e.g. 180" />
+                  <span class="unit-pill">cm</span>
+                </div>
+              </label>
+              <label>
+                <span>Preferred weight unit</span>
+                <select id="profileWeightUnit">
+                  <option value="kg">kg</option>
+                  <option value="lb">lb</option>
+                </select>
+              </label>
+              <label>
+                <span>Daily step target</span>
+                <input id="profileStepTarget" type="number" min="0" step="1" placeholder="e.g. 8000" />
+              </label>
+              <div class="form-actions">
+                <button class="btn" type="submit">Save profile</button>
+              </div>
+            </form>
+            <div class="profile-summary" id="profileSummary"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Body metrics</div>
+                <div class="card-subtitle">Useful context, without the tape-measure tribunal.</div>
+              </div>
+            </div>
+
+            <form id="metricForm" class="form-grid">
+              <label>
+                <span>Record time</span>
+                <div class="split-input three-way">
+                  <input id="metricTime" type="time" />
+                  <button class="btn-ghost small-btn" id="metricNowBtn" type="button">Now</button>
+                </div>
+              </label>
+
+              <label>
+                <span>Body weight</span>
+                <div class="split-input metric-weight-grid">
+                  <input id="bodyWeightValue" type="number" min="0" step="0.1" placeholder="e.g. 86.9" />
+                  <select id="bodyWeightUnit">
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                  </select>
+                  <button class="btn-ghost small-btn" id="flipWeightUnit" type="button">Flip</button>
+                </div>
+              </label>
+              <div class="entry-note" id="metricWeightHint">Equivalent weight will appear here.</div>
+              <div class="entry-note" id="metricBmiHint">BMI preview will appear here when height is available.</div>
+
+              <div class="form-grid two-col nested-grid">
+                <label>
+                  <span>Sleep</span>
+                  <div class="split-input">
+                    <input id="sleepHours" type="number" min="0" step="0.1" placeholder="e.g. 6.5" />
+                    <span class="unit-pill">hrs</span>
+                  </div>
+                </label>
+                <label>
+                  <span>Steps</span>
+                  <input id="metricSteps" type="number" min="0" step="1" placeholder="e.g. 7400" />
+                </label>
+                <label>
+                  <span>Systolic BP</span>
+                  <input id="systolic" type="number" min="0" step="1" placeholder="e.g. 118" />
+                </label>
+                <label>
+                  <span>Diastolic BP</span>
+                  <input id="diastolic" type="number" min="0" step="1" placeholder="e.g. 80" />
+                </label>
+                <label>
+                  <span>Pulse</span>
+                  <div class="split-input">
+                    <input id="pulseBpm" type="number" min="0" step="1" placeholder="e.g. 75" />
+                    <span class="unit-pill">bpm</span>
+                  </div>
+                </label>
+                <label>
+                  <span>Energy</span>
+                  <select id="energy">
+                    <option value="">Not specified</option>
+                    <option value="low">Low</option>
+                    <option value="flat">Flat</option>
+                    <option value="steady">Steady</option>
+                    <option value="good">Good</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Soreness / pain</span>
+                  <select id="soreness">
+                    <option value="">Not specified</option>
+                    <option value="none">None</option>
+                    <option value="light">Light</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="strong">Strong</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                <span>Notes</span>
+                <textarea id="metricNotes" placeholder="e.g. scales may be weighing light, poor sleep, shoulder still calm"></textarea>
+              </label>
+
+              <div class="form-actions">
+                <button class="btn" type="submit">Save body metric</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Session notes</div>
+                <div class="card-subtitle">For shoulder response, recovery, context, and all the reality that refuses to fit inside rep counts.</div>
+              </div>
+            </div>
+
+            <form id="noteForm" class="form-grid">
+              <label>
+                <span>Record time</span>
+                <div class="split-input three-way">
+                  <input id="noteTime" type="time" />
+                  <button class="btn-ghost small-btn" id="noteNowBtn" type="button">Now</button>
+                </div>
+              </label>
+              <label>
+                <span>Title</span>
+                <input id="noteTitle" type="text" placeholder="e.g. Shoulder response" />
+              </label>
+              <label>
+                <span>Body</span>
+                <textarea id="noteBody" placeholder="Write the useful truth of the session, not polished app nonsense."></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="btn" type="submit">Save note</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Today so far</div>
+                <div class="card-subtitle">A quick snapshot of the currently selected day.</div>
+              </div>
+            </div>
+            <div class="stats-grid" id="todayStats"></div>
+            <div class="divider"></div>
+            <div class="compact-list" id="todayExerciseList"></div>
+            <div class="divider"></div>
+            <div class="compact-list" id="todayContextList"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./entry.js"></script>
+</body>
+</html>

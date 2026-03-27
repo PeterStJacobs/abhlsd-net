@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge | mobile-friendly exercise entry and history for ABHLSD.net" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-ghost" href="../index.html" aria-label="Back to ABHLSD.net">← Back to ABHLSD.net</a>
+      </div>
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">Entry • history • metrics • notes • profile</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="page compact stack">
+      <section class="hero">
+        <div class="hero-title">Record now. Review later. Let the analysis behave itself.</div>
+        <div class="hero-copy">
+          Draft V3 splits the page into a thumb-friendly entry flow and a separate history archive, with record times, BMI-ready profile fields, cardio-specific inputs, and editing from the history page.
+        </div>
+
+        <div class="navtabs">
+          <a class="navtab active" href="./entry.html">Open Entry</a>
+          <a class="navtab" href="./history.html">Open History</a>
+        </div>
+      </section>
+
+      <section class="stats-grid" id="snapshotCards"></section>
+
+      <section class="card-grid">
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Today at a glance</div>
+              <div class="card-subtitle">A snapshot of the current day for the active person.</div>
+            </div>
+          </div>
+          <div class="today-list" id="todayBreakdown"></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Storage and backup</div>
+              <div class="card-subtitle">Still browser-local for now, but easy to back up.</div>
+            </div>
+          </div>
+          <div class="export-row">
+            <button class="btn" id="exportBtn" type="button">Export JSON backup</button>
+            <label class="btn btn-ghost" for="importInput">Import JSON backup</label>
+            <input id="importInput" type="file" accept="application/json" class="hidden" />
+            <div class="footer-note">Draft V3 stores data in this browser. The schema is ready for a more private backend later without throwing out the front-end structure.</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

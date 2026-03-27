@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Challenge History | ABHLSD.net</title>
+  <meta name="theme-color" content="#002D89" />
+  <meta name="description" content="The Challenge history page for exercise records, metrics, and notes" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-ghost" href="../index.html" aria-label="Back to ABHLSD.net">← Back</a>
+      </div>
+      <div class="topbar-center">
+        <div class="brand">The Challenge</div>
+        <div class="subbrand">History</div>
+      </div>
+      <div class="topbar-right">
+        <span class="badge">TC</span>
+      </div>
+    </header>
+
+    <main class="page compact stack">
+      <nav class="navtabs" aria-label="The Challenge pages">
+        <a class="navtab" href="./entry.html">Entry</a>
+        <a class="navtab active" href="./history.html">History</a>
+      </nav>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">History filters</div>
+            <div class="card-subtitle">Review by person, period, exercise, category, and text search.</div>
+          </div>
+        </div>
+
+        <div class="search-row">
+          <label>
+            <span>Exercise search</span>
+            <input id="searchText" type="text" placeholder="Search by exercise name, note, or metric detail" />
+          </label>
+
+          <label>
+            <span>Person</span>
+            <select id="filterUser"></select>
+          </label>
+
+          <label>
+            <span>Category</span>
+            <select id="filterCategory">
+              <option value="">All categories</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Exercise</span>
+            <select id="filterExercise">
+              <option value="">All exercises</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Start date</span>
+            <input id="filterStart" type="date" />
+          </label>
+
+          <label>
+            <span>End date</span>
+            <input id="filterEnd" type="date" />
+          </label>
+        </div>
+      </section>
+
+      <section class="stats-grid" id="historyStats"></section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">History timeline</div>
+            <div class="card-subtitle">Exercises, metrics, and notes grouped by day. Use Edit to fix dates or details.</div>
+          </div>
+        </div>
+
+        <div class="timeline-grid" id="historyTimeline"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="editModalBackdrop"></div>
+  <div class="modal hidden" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="modal-head">
+      <div>
+        <div class="card-title" id="editModalTitle">Edit entry</div>
+        <div class="card-subtitle" id="editModalSubtitle">Correct the details, then save.</div>
+      </div>
+      <button type="button" class="iconbtn" id="closeEditModal" aria-label="Close edit dialog">✕</button>
+    </div>
+
+    <form id="editExerciseForm" class="form-grid two-col hidden modal-form">
+      <input id="editExerciseIdHidden" type="hidden" />
+      <label><span>Date</span><input id="editExerciseDate" type="date" /></label>
+      <label><span>Time</span><input id="editExerciseTime" type="time" /></label>
+      <label><span>Person</span><select id="editExerciseUser"></select></label>
+      <label><span>Exercise</span><select id="editExerciseSelect"></select></label>
+      <label id="editCustomNameWrap" class="hidden"><span>Custom exercise name</span><input id="editCustomExerciseName" type="text" /></label>
+      <label id="editCustomCategoryWrap" class="hidden"><span>Custom category</span><select id="editCustomCategory"><option value="strength">Strength</option><option value="cardio">Cardio</option><option value="mobility">Mobility</option><option value="rehab">Rehab</option><option value="core">Core</option></select></label>
+      <label><span>Sets</span><input id="editSets" type="number" min="0" step="1" /></label>
+      <label><span>Reps</span><input id="editReps" type="number" min="0" step="1" /></label>
+      <label><span>Weight</span><div class="split-input"><input id="editWeight" type="number" min="0" step="0.1" /><select id="editWeightUnit"><option value="kg">kg</option><option value="lb">lb</option></select></div></label>
+      <label><span>Duration (min)</span><input id="editDurationMin" type="number" min="0" step="0.1" /></label>
+      <label><span>Distance (km)</span><input id="editDistanceKm" type="number" min="0" step="0.01" /></label>
+      <label><span>Resistance</span><input id="editResistance" type="text" /></label>
+      <label><span>Side / limb</span><select id="editSide"><option value="">Not specified</option><option value="both">Both</option><option value="left">Left</option><option value="right">Right</option><option value="alternating">Alternating</option></select></label>
+      <label><span>Effort</span><select id="editEffort"><option value="">Not specified</option><option value="easy">Easy</option><option value="steady">Steady</option><option value="moderate">Moderate</option><option value="hard">Hard</option></select></label>
+      <label><span>Joint pain</span><select id="editJointPain"><option value="">Not specified</option><option value="no">No</option><option value="mild">Mild</option><option value="moderate">Moderate</option><option value="strong">Strong</option></select></label>
+      <div class="field-group span-2 hidden" id="editBikeFields">
+        <div class="group-title">Bike / cycling fields</div>
+        <div class="form-grid two-col nested-grid">
+          <label><span>Average HR</span><input id="editAvgHr" type="number" min="0" step="1" /></label>
+          <label><span>Max HR</span><input id="editMaxHr" type="number" min="0" step="1" /></label>
+          <label><span>Workout calories</span><input id="editWorkoutCalories" type="number" min="0" step="1" /></label>
+        </div>
+      </div>
+      <div class="field-group span-2 hidden" id="editWalkingFields">
+        <div class="group-title">Walking / treadmill fields</div>
+        <div class="form-grid two-col nested-grid">
+          <label><span>Average speed (km/h)</span><input id="editAvgSpeedKmh" type="number" min="0" step="0.1" /></label>
+          <label><span>Average HR</span><input id="editWalkAvgHr" type="number" min="0" step="1" /></label>
+          <label><span>Max HR</span><input id="editWalkMaxHr" type="number" min="0" step="1" /></label>
+          <label><span>Workout calories</span><input id="editWalkCalories" type="number" min="0" step="1" /></label>
+          <label><span>Steps</span><input id="editExerciseSteps" type="number" min="0" step="1" /></label>
+          <label><span>Average cadence</span><input id="editAvgCadence" type="number" min="0" step="1" /></label>
+        </div>
+      </div>
+      <div class="field-group span-2 hidden" id="editRowingFields">
+        <div class="group-title">Rowing fields</div>
+        <div class="form-grid two-col nested-grid">
+          <label><span>Average pace /500m</span><input id="editAvgPace500" type="text" /></label>
+          <label><span>Average stroke rate</span><input id="editAvgStrokeRate" type="number" min="0" step="1" /></label>
+          <label><span>Average HR</span><input id="editRowAvgHr" type="number" min="0" step="1" /></label>
+          <label><span>Max HR</span><input id="editRowMaxHr" type="number" min="0" step="1" /></label>
+          <label><span>Average power</span><input id="editAvgPower" type="number" min="0" step="1" /></label>
+        </div>
+      </div>
+      <label class="span-2"><span>Notes</span><textarea id="editExerciseNotes"></textarea></label>
+      <div class="form-actions span-2"><button class="btn" type="submit">Save changes</button></div>
+    </form>
+
+    <form id="editMetricForm" class="form-grid two-col hidden modal-form">
+      <input id="editMetricIdHidden" type="hidden" />
+      <label><span>Date</span><input id="editMetricDate" type="date" /></label>
+      <label><span>Time</span><input id="editMetricTime" type="time" /></label>
+      <label><span>Person</span><select id="editMetricUser"></select></label>
+      <label><span>Body weight</span><div class="split-input"><input id="editBodyWeight" type="number" min="0" step="0.1" /><select id="editBodyWeightUnit"><option value="kg">kg</option><option value="lb">lb</option></select></div></label>
+      <label><span>Sleep hours</span><input id="editSleepHours" type="number" min="0" step="0.1" /></label>
+      <label><span>Steps</span><input id="editMetricSteps" type="number" min="0" step="1" /></label>
+      <label><span>Systolic</span><input id="editSystolic" type="number" min="0" step="1" /></label>
+      <label><span>Diastolic</span><input id="editDiastolic" type="number" min="0" step="1" /></label>
+      <label><span>Pulse</span><input id="editPulseBpm" type="number" min="0" step="1" /></label>
+      <label><span>Energy</span><select id="editEnergy"><option value="">Not specified</option><option value="low">Low</option><option value="flat">Flat</option><option value="steady">Steady</option><option value="good">Good</option><option value="high">High</option></select></label>
+      <label><span>Soreness</span><select id="editSoreness"><option value="">Not specified</option><option value="none">None</option><option value="light">Light</option><option value="moderate">Moderate</option><option value="strong">Strong</option></select></label>
+      <label class="span-2"><span>Notes</span><textarea id="editMetricNotes"></textarea></label>
+      <div class="form-actions span-2"><button class="btn" type="submit">Save changes</button></div>
+    </form>
+
+    <form id="editNoteForm" class="form-grid two-col hidden modal-form">
+      <input id="editNoteIdHidden" type="hidden" />
+      <label><span>Date</span><input id="editNoteDate" type="date" /></label>
+      <label><span>Time</span><input id="editNoteTime" type="time" /></label>
+      <label><span>Person</span><select id="editNoteUser"></select></label>
+      <div></div>
+      <label class="span-2"><span>Title</span><input id="editNoteTitle" type="text" /></label>
+      <label class="span-2"><span>Body</span><textarea id="editNoteBody"></textarea></label>
+      <div class="form-actions span-2"><button class="btn" type="submit">Save changes</button></div>
+    </form>
+  </div>
+
+  <script type="module" src="./history.js"></script>
+</body>
+</html>
