@@ -489,7 +489,7 @@ textarea{
   z-index: 100;
 
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr) 92px;
   align-items: center;
   gap: 12px;
 
@@ -516,6 +516,8 @@ textarea{
 .page-title-wrap{
   text-align: center;
   min-width: 0;
+  max-width: 100%;
+  padding: 0 4px;
 }
 
 .page-title{
@@ -529,8 +531,9 @@ textarea{
   font-size: clamp(0.9rem, 1.3vw, 1rem);
   line-height: 1.25;
   opacity: 0.92;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-
 .nav-btn{
   display: inline-flex;
   align-items: center;
@@ -565,6 +568,7 @@ textarea{
 
 @media (max-width: 700px){
   .page-header{
+    grid-template-columns: 76px minmax(0, 1fr) 76px;
     gap: 10px;
     margin-bottom: 14px;
     padding: 10px 12px;
@@ -586,7 +590,7 @@ textarea{
   }
 
   .header-spacer{
-    min-width: 92px;
+    min-width: 76px;
     min-height: 40px;
   }
 }
