@@ -31,17 +31,9 @@
 <link rel="icon" href="assets/ABHLSD-favicon-32.png">
 
 <style>
-  html, body { height: 100%; margin: 0; }
-  body {
-    font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    color: #e8ecff;
-    overflow: hidden;
-    background: var(--pageBg);
-  }
-
   :root{
-    --padX: 2vw;
-    --padY: 2vh;
+    --padX: clamp(12px, 2vw, 28px);
+    --padY: clamp(12px, 2vh, 24px);
     --pageBg: #002D89;
 
     --clr-a: #FFFF00;
@@ -51,34 +43,60 @@
     --clr-s: #00B0F0;
     --clr-d: #7030A0;
 
-    /* Motto only */
     --mottoClr: #FFFF00;
-    --mottoSize: clamp(14px, 2.6vw, 32px); /* smaller than tooltips */
+    --mottoSize: clamp(14px, 2.6vw, 32px);
+  }
+
+  html, body {
+    min-height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    color: #e8ecff;
+    background: var(--pageBg);
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .page{
+    min-height: 100svh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(16px, 2vh, 28px);
+    padding:
+      var(--padY)
+      var(--padX)
+      calc(var(--padY) + env(safe-area-inset-bottom, 0px));
+    background: var(--pageBg);
   }
 
   .stage{
-    position: fixed;
-    top: var(--padY);
-    bottom: var(--padY);
-    left: var(--padX);
-    right: var(--padX);
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 280px;
     background: var(--pageBg);
   }
 
   .bg{
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     object-position: center;
-    user-select: none; -webkit-user-drag: none;
+    user-select: none;
+    -webkit-user-drag: none;
   }
 
-  /* Overlay sized by JS to the drawn image rect.
-     Fallback size keeps hover alive even before layout completes. */
   .hotspots{
     position: absolute;
-    left: 0; top: 0;
-    width: 100%; height: 100%;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
     z-index: 2;
   }
@@ -91,12 +109,16 @@
     cursor: help;
     outline: none;
     pointer-events: auto;
-    color: transparent; font-size: 0;
+    color: transparent;
+    font-size: 0;
     touch-action: manipulation;
   }
-  .spot:focus-visible { outline: 2px solid rgba(122,162,255,.9); border-radius: 8px; }
 
-  /* Tooltip bubble */
+  .spot:focus-visible {
+    outline: 2px solid rgba(122,162,255,.9);
+    border-radius: 8px;
+  }
+
   .spot::after{
     content: attr(data-tt);
     position: absolute;
@@ -108,15 +130,17 @@
     padding: 8px 10px;
     border-radius: 10px;
     font-family: "Great Vibes", cursive;
-    font-size: clamp(18px, 3.5vw, 34px); /* tooltip size */
-    white-space: nowrap;
+    font-size: clamp(18px, 3.5vw, 34px);
     line-height: 1.2;
     font-weight: 900;
     text-shadow: 0 0 6px rgba(0,0,0,.25);
+    white-space: nowrap;
+    max-width: min(80vw, 280px);
     opacity: 0;
     pointer-events: none;
     transition: opacity 1s ease, transform 1s ease;
   }
+
   .spot::before{
     content: "";
     position: absolute;
@@ -130,57 +154,116 @@
   }
 
   .spot:hover::after, .spot:hover::before,
-  .spot:focus::after, .spot:focus::before{ opacity: 1; }
+  .spot:focus::after, .spot:focus::before{
+    opacity: 1;
+  }
+
   .spot:hover::after, .spot:focus::after{
     transform: translateX(-50%) translateY(0);
   }
 
   .spot.active::after,
-  .spot.active::before { opacity: 1; }
-  .spot.active::after { transform: translateX(-50%) translateY(0); }
-
-  @media (prefers-reduced-motion: reduce){
-    .spot::after, .spot::before { transition: none; }
+  .spot.active::before {
+    opacity: 1;
   }
 
-  /* Hotspot positions (% of the image rect) */
-  .spot-a{ --clr: var(--clr-a); top: 38%; left: 0%;  width: 18%; height: 24%; }
-  .spot-b{ --clr: var(--clr-b); top: 38%; left: 19%; width: 18%; height: 24%; }
-  .spot-heart{ --clr: var(--clr-heart); top: 38%; left: 38%; width: 15%; height: 24%; }
-  .spot-l{ --clr: var(--clr-l); top: 38%; left: 52%; width: 13%; height: 24%; }
-  .spot-s{ --clr: var(--clr-s); top: 38%; left: 65%; width: 13%; height: 24%; }
-  .spot-d{ --clr: var(--clr-d); top: 38%; left: 78%; width: 15%; height: 24%; }
+  .spot.active::after {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .spot::after, .spot::before {
+      transition: none;
+    }
+  }
+
+  .spot-a{
+    --clr: var(--clr-a);
+    top: 38%;
+    left: 0%;
+    width: 18%;
+    height: 24%;
+  }
+
+  .spot-b{
+    --clr: var(--clr-b);
+    top: 38%;
+    left: 19%;
+    width: 18%;
+    height: 24%;
+  }
+
+  .spot-heart{
+    --clr: var(--clr-heart);
+    top: 38%;
+    left: 38%;
+    width: 15%;
+    height: 24%;
+  }
+
+  .spot-l{
+    --clr: var(--clr-l);
+    top: 38%;
+    left: 52%;
+    width: 13%;
+    height: 24%;
+  }
+
+  .spot-s{
+    --clr: var(--clr-s);
+    top: 38%;
+    left: 65%;
+    width: 13%;
+    height: 24%;
+  }
+
+  .spot-d{
+    --clr: var(--clr-d);
+    top: 38%;
+    left: 78%;
+    width: 15%;
+    height: 24%;
+  }
 
   .btn-row {
-    position: fixed;
-    left: 50%;
-    bottom: calc(var(--padY) + 28px);
-    transform: translateX(-50%);
-    display: flex;
-    gap: 16px;
+    width: min(100%, 1100px);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
     z-index: 3;
   }
 
   .btn {
     background: #7aa2ff;
     color: #0b1020;
-    padding: 12px 16px;
+    padding: 14px 16px;
+    min-height: 52px;
     border-radius: 12px;
     text-decoration: none;
     box-shadow: 0 10px 24px rgba(0,0,0,0.35);
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: 600;
+    box-sizing: border-box;
   }
-  .btn:hover { filter: brightness(1.05); }
+
+  .btn:hover {
+    filter: brightness(1.05);
+  }
+
   .btn:focus-visible {
     outline: 2px solid #fff;
     outline-offset: 2px;
     border-radius: 12px;
   }
 
-  /* ---------- Motto ---------- */
   .motto{
     position: absolute;
-    left: 0; top: 0; /* JS sets exact px position */
+    left: 0;
+    top: 0;
     font-family: "Great Vibes", cursive;
     font-size: var(--mottoSize);
     color: var(--mottoClr);
@@ -188,65 +271,95 @@
     white-space: nowrap;
     pointer-events: none;
     z-index: 4;
-
-    /* start hidden, fade in like tooltips */
     opacity: 0;
     transform: translateY(6px);
     transition: opacity 1s ease, transform 1s ease;
   }
 
-  /* When "on", it fades in and lifts slightly (same vibe as tooltips) */
   .motto.on{
     opacity: 1;
     transform: translateY(0);
   }
 
-  .motto-amp{ display: inline-block; } /* lets JS measure the & */
-
-<!--
-  .motto.flash{ animation: mottoFlash 1.6s ease-in-out; }
-
-  @keyframes mottoFlash{
-    0%   { opacity: 0; }
-    15%  { opacity: 1; }
-    75%  { opacity: 1; }
-    100% { opacity: 0; }
+  .motto-amp{
+    display: inline-block;
   }
--->
 
   @media (prefers-reduced-motion: reduce){
-    .motto.flash{ animation: none; opacity: 1; }
+    .motto{
+      transition: none;
+    }
+  }
+
+  @media (min-width: 980px){
+    .btn-row{
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px){
+    .page{
+      gap: 16px;
+    }
+
+    .stage{
+      min-height: 220px;
+    }
+
+    .btn-row{
+      grid-template-columns: 1fr;
+    }
+
+    .btn{
+      min-height: 50px;
+      padding: 13px 14px;
+      font-size: 15px;
+    }
+
+    .spot::after{
+      font-size: clamp(16px, 6vw, 26px);
+      padding: 6px 8px;
+    }
+
+    .motto{
+      max-width: calc(100% - 16px);
+      white-space: normal;
+      text-align: center;
+      line-height: 1.1;
+    }
   }
 </style>
 </head>
 
 <body>
-  <div class="stage" id="stage">
-    <img class="bg" id="bg"
-         src="assets/ABHLSD Italics - No WP.jpg"
-         alt="ABHLSD artwork"
-         decoding="async"
-         fetchpriority="high" />
+  <div class="page">
+    <div class="stage" id="stage">
+      <img class="bg" id="bg"
+           src="assets/ABHLSD Italics - No WP.jpg"
+           alt="ABHLSD artwork"
+           decoding="async"
+           fetchpriority="high" />
 
-    <div class="hotspots" id="hot" aria-label="Letter tooltips">
-      <button type="button" class="spot spot-a"     data-tt="Aussie" aria-label="Aussie"></button>
-      <button type="button" class="spot spot-b"     data-tt="Bear"   aria-label="Bear"></button>
-      <button type="button" class="spot spot-heart" data-tt="Loves"  aria-label="Loves"></button>
-      <button type="button" class="spot spot-l"     data-tt="Lady"   aria-label="Lady"></button>
-      <button type="button" class="spot spot-s"     data-tt="Star"   aria-label="Star"></button>
-      <button type="button" class="spot spot-d"     data-tt="Dust"   aria-label="Dust"></button>
+      <div class="hotspots" id="hot" aria-label="Letter tooltips">
+        <button type="button" class="spot spot-a"     data-tt="Aussie" aria-label="Aussie"></button>
+        <button type="button" class="spot spot-b"     data-tt="Bear"   aria-label="Bear"></button>
+        <button type="button" class="spot spot-heart" data-tt="Loves"  aria-label="Loves"></button>
+        <button type="button" class="spot spot-l"     data-tt="Lady"   aria-label="Lady"></button>
+        <button type="button" class="spot spot-s"     data-tt="Star"   aria-label="Star"></button>
+        <button type="button" class="spot spot-d"     data-tt="Dust"   aria-label="Dust"></button>
 
-      <div class="motto" id="motto" aria-hidden="true">
-        Always&nbsp;<span class="motto-amp">&amp;</span>&nbsp;Forever
+        <div class="motto" id="motto" aria-hidden="true">
+          Always&nbsp;<span class="motto-amp">&amp;</span>&nbsp;Forever
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="btn-row">
-    <a class="btn" href="./mv/index.html">Mars-Venus Separation</a>
-    <a class="btn" href="./afds/index.html">An Féilire de Seo</a>
-    <a class="btn" href="./rtn/index.html">The Red Thread Notebook</a>
-    <a class="btn" href="./tc/index.html">The Challenge</a>
+    <div class="btn-row">
+      <a class="btn" href="./mv/index.html">Mars-Venus Separation</a>
+      <a class="btn" href="./afds/index.html">An Féilire de Seo</a>
+      <a class="btn" href="./rtn/index.html">The Red Thread Notebook</a>
+      <a class="btn" href="./tc/index.html">The Challenge</a>
+    </div>
   </div>
 
 <script>
@@ -263,23 +376,17 @@
     const hr   = heart.getBoundingClientRect();
     const hotR = hot.getBoundingClientRect();
 
-    /* Tweak knobs (if needed)
-       X nudges left/right, Y nudges where “heart point” is inside the hotspot box */
-
     const heartPointX = 0.40;
     const heartPointY = 1.00;
 
     const ax = (hr.left + hr.width  * heartPointX) - hotR.left;
     const ay = (hr.top  + hr.height * heartPointY) - hotR.top;
 
-    // Tiny gap below the point (keep it almost “touching”)
     const dy = Math.max(1, Math.min(8, drawH * 0.010));
     const top = ay + dy;
 
-    // Set vertical position first
-    motto.style.top  = top + 'px';
+    motto.style.top = top + 'px';
 
-    // Measure where the & sits inside the motto, then shift so & centre = ax
     motto.style.left = '0px';
     const ampEl = motto.querySelector('.motto-amp');
     if (!ampEl) return;
@@ -330,8 +437,8 @@
   let leaveTimer = null;
   let inLetters = false;
 
-  const LEAVE_GRACE_MS = 140;   // prevents “gap” exits when moving between letters
-  const LINGER_MS      = 1000;  // how long motto stays after leaving letters (a few seconds)
+  const LEAVE_GRACE_MS = 140;
+  const LINGER_MS      = 1000;
 
   function showMotto(){
     if (!motto) return;
@@ -341,7 +448,6 @@
   function scheduleHide(){
     if (!motto) return;
 
-    // If we really left the letters, keep it visible for a few seconds, then fade out
     leaveTimer = setTimeout(() => {
       inLetters = false;
       motto.classList.remove('on');
@@ -349,13 +455,15 @@
   }
 
   function enterLetters(){
-    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+    if (leaveTimer) {
+      clearTimeout(leaveTimer);
+      leaveTimer = null;
+    }
 
     if (!inLetters){
       inLetters = true;
       showMotto();
     } else {
-      // already “in letters”, just ensure it stays on
       showMotto();
     }
   }
@@ -363,25 +471,22 @@
   function leaveLetters(){
     if (leaveTimer) clearTimeout(leaveTimer);
 
-    // Grace period so crossing tiny gaps doesn't count as leaving
     leaveTimer = setTimeout(() => {
-      // after grace, start the linger timer
       scheduleHide();
     }, LEAVE_GRACE_MS);
   }
 
-  // Show briefly on page load (optional, keeps your original “refresh shows motto” behaviour)
   window.addEventListener('load', () => {
     showMotto();
-    // If user doesn't hover letters, it will fade away after LINGER_MS
+
     if (leaveTimer) clearTimeout(leaveTimer);
     leaveTimer = setTimeout(() => {
       if (!inLetters && motto) motto.classList.remove('on');
     }, LINGER_MS);
   });
 
-  spots.forEach(btn=>{
-    btn.setAttribute('aria-expanded','false');
+  spots.forEach(btn => {
+    btn.setAttribute('aria-expanded', 'false');
 
     btn.addEventListener('mouseenter', enterLetters);
     btn.addEventListener('mouseleave', leaveLetters);
@@ -389,33 +494,41 @@
     btn.addEventListener('focus', enterLetters);
     btn.addEventListener('blur', leaveLetters);
 
-    btn.addEventListener('click', (e)=>{
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
 
-      // keep motto visible on tap as well
       enterLetters();
 
       const makeActive = !btn.classList.contains('active');
-      spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
-      if (makeActive) { btn.classList.add('active'); btn.setAttribute('aria-expanded','true'); }
+      spots.forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-expanded', 'false');
+      });
+
+      if (makeActive) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-expanded', 'true');
+      }
     });
   });
 
-  // Click outside closes any open tooltip (your existing behaviour)
-  document.addEventListener('click', ()=>{
-    spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
+  document.addEventListener('click', () => {
+    spots.forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-expanded', 'false');
+    });
   });
 
-  // ESC closes too
-  document.addEventListener('keydown', (e)=>{
+  document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){
-      spots.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-expanded','false'); });
+      spots.forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-expanded', 'false');
+      });
     }
   });
 })();
 </script>
 
-
 </body>
 </html>
-
