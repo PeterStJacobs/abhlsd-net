@@ -1,5 +1,5 @@
-# The Red Thread Film Notebook
-# This one is for you, Tamara.
+# The Red Thread Notebook
+# 
 
 Entries
 1. [Passengers](./Passengers.html)
