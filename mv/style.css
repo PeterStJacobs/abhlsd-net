@@ -440,7 +440,7 @@ canvas{
   align-items: center;
   gap: 12px;
   margin-bottom: 18px;
-  padding: 0 12px;
+  padding: 0 clamp(10px, 2vw, 20px);
 }
 
 .header-side{
