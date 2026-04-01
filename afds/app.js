@@ -3088,9 +3088,16 @@ function updateAnalog(hostId, dt){
 function bindControls(){
   el('viewSelect').addEventListener('change', (e)=>{
     state.view = e.target.value;
+
     const mode = el('jumpMode').value;
     const seo = canonicalSeoianDate(state.focusDateISO);
     el('jumpInput').value = (mode === 'gregorian') ? fmtGreg(state.focusDateISO) : (seo.canonical ? seo.label : '');
+
+    if(state.view === 'day'){
+      snapshotDay(state.focusDateISO);
+      return;
+    }
+
     render();
   });
 
