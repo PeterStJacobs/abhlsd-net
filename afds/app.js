@@ -1562,11 +1562,7 @@ function renderMonthView(){
         day.appendChild(more);
       }
 
-      day.addEventListener('mouseenter', ()=>{
-        if(window.matchMedia('(max-width: 1040px)').matches) return;
-        snapshotDay(dateISO);
-      });
-      day.addEventListener('click', ()=> snapshotDay(dateISO));
+      day.addEventListener('click', ()=> activateDate(dateISO));
 
       daysEl.appendChild(day);
     }
@@ -1621,11 +1617,7 @@ function renderWeekView(){
     const weather = buildWeatherMarkerEl(dateISO, { compact: true });
     if(weather) cell.appendChild(weather);
 
-    cell.addEventListener('mouseenter', ()=>{
-      if(window.matchMedia('(max-width: 1040px)').matches) return;
-      snapshotDay(dateISO);
-    });
-    cell.addEventListener('click', ()=> snapshotDay(dateISO));
+    cell.addEventListener('click', ()=> activateDate(dateISO));
 
     header.appendChild(cell);
   }
@@ -1864,11 +1856,7 @@ function renderListView(){
 
     card.appendChild(items);
 
-    card.addEventListener('mouseenter', ()=>{
-      if(window.matchMedia('(max-width: 1040px)').matches) return;
-      snapshotDay(dateISO);
-    });
-    card.addEventListener('click', ()=> snapshotDay(dateISO));
+    card.addEventListener('click', ()=> activateDate(dateISO));
 
     wrap.appendChild(card);
   }
