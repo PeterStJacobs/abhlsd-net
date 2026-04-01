@@ -3125,8 +3125,19 @@ function bindControls(){
     }
 
     const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
-    const next = (state.view === 'week') ? dt.minus({weeks:1}) : dt.minus({days:30});
+
+    let next;
+    if(state.view === 'week') next = dt.minus({weeks:1});
+    else if(state.view === 'day' || state.view === 'clocks') next = dt.minus({days:1});
+    else next = dt.minus({days:30});
+
     state.focusDateISO = next.toISODate();
+
+    if(state.view === 'day'){
+      snapshotDay(state.focusDateISO);
+      return;
+    }
+
     render();
   });
 
