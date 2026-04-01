@@ -3293,6 +3293,12 @@ function bindControls(){
       const iso = dateISOFromDMY(val);
       if(!iso) return alert('Invalid Gregorian date (DD/MM/YYYY).');
       state.focusDateISO = iso;
+
+      if(state.view === 'day'){
+        snapshotDay(state.focusDateISO);
+        return;
+      }
+
       render();
       return;
     }
@@ -3308,6 +3314,12 @@ function bindControls(){
     if(!iso) return alert('Seoian date out of range for that SuperMonth.');
 
     state.focusDateISO = iso;
+
+    if(state.view === 'day'){
+      snapshotDay(state.focusDateISO);
+      return;
+    }
+
     render();
   });
 
