@@ -3146,16 +3146,27 @@ function bindControls(){
       const seo = canonicalSeoianDate(state.focusDateISO);
       if(seo.canonical){
         let y = seo.year;
-          let m = seo.canonical.monthNo + 1;
-          if(m > 13){ m = 1; y = y + 1; }
-          const r = getRangeForMonth(y, m);
-          if(r){ state.focusDateISO = r.start; render(); return; }
+        let m = seo.canonical.monthNo + 1;
+        if(m > 13){ m = 1; y = y + 1; }
+        const r = getRangeForMonth(y, m);
+        if(r){ state.focusDateISO = r.start; render(); return; }
       }
     }
 
     const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
-    const next = (state.view === 'week') ? dt.plus({weeks:1}) : dt.plus({days:30});
+
+    let next;
+    if(state.view === 'week') next = dt.plus({weeks:1});
+    else if(state.view === 'day' || state.view === 'clocks') next = dt.plus({days:1});
+    else next = dt.plus({days:30});
+
     state.focusDateISO = next.toISODate();
+
+    if(state.view === 'day'){
+      snapshotDay(state.focusDateISO);
+      return;
+    }
+
     render();
   });
 
