@@ -3103,8 +3103,14 @@ function bindControls(){
 
   el('btnToday').addEventListener('click', ()=>{
     state.focusDateISO = DateTime.now().setZone(state.displayTZ).toISODate();
+
+    if(state.view === 'day'){
+      snapshotDay(state.focusDateISO);
+      return;
+    }
+
     render();
-  });
+  }); 
 
   el('btnPrev').addEventListener('click', ()=>{
     if(state.view === 'month'){
