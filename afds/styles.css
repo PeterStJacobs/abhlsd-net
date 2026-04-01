@@ -925,6 +925,52 @@ body{
   overflow-wrap: anywhere;
 }
 
+.single-view-card .panel-inner{
+  padding: 0;
+  height: auto;
+  overflow: visible;
+}
+
+.mobile-clocks-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.mobile-clock-card{
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  padding: 12px;
+}
+
+.mobile-clock-label{
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.mobile-clock-zone{
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.mobile-superday-meta{
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mobile-superday-meta span{
+  font-family: var(--mono);
+}
+
 .afds-nav-btn{
   display: inline-flex;
   align-items: center;
