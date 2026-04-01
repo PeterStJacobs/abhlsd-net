@@ -328,6 +328,20 @@
       line-height: 1.1;
     }
   }
+  
+  @media (max-width: 760px) and (orientation: landscape){
+    .page{
+      gap: 12px;
+    }
+
+    .stage{
+      min-height: 180px;
+    }
+
+    .btn-row{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
 </style>
 </head>
 
