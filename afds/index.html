@@ -88,62 +88,63 @@
             <div class="title" id="calTitle">—</div>
           </div>
 
-          <div class="controls">
-            <div class="control">
-              <label for="viewSelect">View</label>
-              <select id="viewSelect">
-                <option value="month">Month</option>
-                <option value="week">Week</option>
-                <option value="list">List</option>
+        <div class="controls">
+          <div class="control">
+            <label for="viewSelect">View</label>
+            <select id="viewSelect">
+              <option value="month">Month</option>
+              <option value="week">Week</option>
+              <option value="day">Day</option>
+              <option value="list">List</option>
+              <option value="clocks">Clocks</option>
+            </select>
+          </div>
+
+          <div class="control control-mobile-extra jump">
+            <label for="jumpInput">Jump</label>
+            <div class="jump-row">
+              <select id="jumpMode">
+                <option value="seoian" selected>Seoian</option>
+                <option value="gregorian">Gregorian</option>
               </select>
+              <input id="jumpInput" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" />
+              <button class="btn" id="btnJump" type="button">Go</button>
             </div>
+          </div>
 
-            <div class="control jump">
-              <label for="jumpInput">Jump</label>
-              <div class="jump-row">
-                <select id="jumpMode">
-                  <option value="seoian" selected>Seoian</option>
-                  <option value="gregorian">Gregorian</option>
-                </select>
-                <input id="jumpInput" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" />
-                <button class="btn" id="btnJump" type="button">Go</button>
-              </div>
-            </div>
+          <div class="control control-mobile-extra">
+            <label for="displayTZ">Display TZ</label>
+            <select id="displayTZ"></select>
+          </div>
 
-            <div class="control">
-              <label for="displayTZ">Display TZ</label>
-              <select id="displayTZ"></select>
-            </div>
+          <div class="control control-mobile-extra">
+            <button class="btn" id="btnFilters" type="button" aria-expanded="false" aria-controls="filtersDropdown">Filters ▾</button>
+            <div class="dropdown" id="filtersDropdown" hidden>
+              <label class="chk">
+                <input type="checkbox" id="filterSupermonths" checked />
+                <span>SuperMonths</span>
+              </label>
 
-            <div class="control">
-              <button class="btn" id="btnFilters" type="button" aria-expanded="false" aria-controls="filtersDropdown">Filters ▾</button>
-              <div class="dropdown" id="filtersDropdown" hidden>
-                <label class="chk">
-                  <input type="checkbox" id="filterSupermonths" checked />
-                  <span>SuperMonths</span>
-                </label>
+              <label class="chk">
+                <input type="checkbox" id="filterSpecialDays" checked />
+                <span>Special Days</span>
+              </label>
 
-                <label class="chk">
-                  <input type="checkbox" id="filterSpecialDays" checked />
-                  <span>Special Days</span>
-                </label>
+              <label class="chk">
+                <input type="checkbox" id="filterStandardDays" checked />
+                <span>Standard Days</span>
+              </label>
 
-                <label class="chk">
-                  <input type="checkbox" id="filterStandardDays" checked />
-                  <span>Standard Days</span>
-                </label>
+              <label class="chk">
+                <input type="checkbox" id="filterOneOff" checked />
+                <span>One-Off Events</span>
+              </label>
 
-                <label class="chk">
-                  <input type="checkbox" id="filterOneOff" checked />
-                  <span>One-Off Events</span>
-                </label>
-
-                <div class="muted small">More layers later.</div>
-              </div>
+              <div class="muted small">More layers later.</div>
             </div>
           </div>
         </div>
-
+          
         <div class="cal-surface" id="calSurface">
           <!-- injected -->
         </div>
