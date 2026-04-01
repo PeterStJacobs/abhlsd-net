@@ -1339,9 +1339,8 @@ function render(){
     el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
   }
 
-  renderCenter();
   renderInspector();
-  renderMobileSheetMirrors();
+  renderCenter();
 }
 
 function renderCenter(){
@@ -1350,7 +1349,46 @@ function renderCenter(){
 
   if(state.view === 'month') surf.appendChild(renderMonthView());
   if(state.view === 'week') surf.appendChild(renderWeekView());
+  if(state.view === 'day') surf.appendChild(renderDayView());
   if(state.view === 'list') surf.appendChild(renderListView());
+  if(state.view === 'clocks') surf.appendChild(renderClocksView());
+}
+
+function renderDayView(){
+  const wrap = document.createElement('div');
+  wrap.className = 'single-view-card day-view';
+
+  const source = el('leftPanel')?.querySelector('.panel-inner');
+  if(!source) return wrap;
+
+  const clone = source.cloneNode(true);
+
+  clone.querySelectorAll('[id]').forEach(node => {
+    node.removeAttribute('id');
+  });
+
+  const deadToggle = clone.querySelector('.toggle');
+  if(deadToggle) deadToggle.remove();
+
+  wrap.appendChild(clone);
+  return wrap;
+}
+
+function renderClocksView(){
+  const wrap = document.createElement('div');
+  wrap.className = 'single-view-card clocks-view';
+
+  const source = el('rightPanel')?.querySelector('.panel-inner');
+  if(!source) return wrap;
+
+  const clone = source.cloneNode(true);
+
+  clone.querySelectorAll('[id]').forEach(node => {
+    node.removeAttribute('id');
+  });
+
+  wrap.appendChild(clone);
+  return wrap;
 }
 
 function renderMonthView(){
