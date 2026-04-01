@@ -97,6 +97,22 @@ const state = {
   }
 };
 
+const MOBILE_BREAKPOINT = 1040;
+
+function isMobileAFDS(){
+  return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+}
+
+function activateDate(dateISO){
+  state.focusDateISO = dateISO;
+
+  if(isMobileAFDS()){
+    state.view = 'day';
+  }
+
+  snapshotDay(dateISO);
+}
+
 // --------------- Updated Helpers (simplified) ------------
 const AFDS_LOCATION_FEATURE = 'supportsAFdS';
 const WEATHER_LOCATION_FEATURE = 'supportsWeather';
