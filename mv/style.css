@@ -447,6 +447,8 @@ canvas{
   margin-bottom: 18px;
   padding: 10px clamp(10px, 2vw, 20px);
 
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+
   background: #002D89;
 }
 
