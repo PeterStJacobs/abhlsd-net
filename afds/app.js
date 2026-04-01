@@ -2,25 +2,11 @@ import * as Astronomy from 'https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19
 
 const { DateTime } = luxon;
 
-/*
-const TZKEY_MAP = {
-  ET_Toronto: 'America/Toronto',
-  AZ_Phoenix: 'America/Phoenix',
-  QLD_Brisbane: 'Australia/Brisbane',
-  ASTRONOMICAL_UTC: 'UTC',
-}; */
-
 const DEFAULTS = {
   tamaraChoice: 'LOC:AZ_Phoenix',
   martinChoice: 'LOC:QLD_Brisbane',
   displayChoice: `TZ:${Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'}`,
 };
-
-/*
-const DEFAULTS = {
-  tamaraTZ: 'America/Phoenix',
-  martinTZ: 'Australia/Brisbane',
-}; */
 
 const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
@@ -31,7 +17,6 @@ const FRIDAY_FLOWERS = {
   extension: '.jpg',
   maxHeightPx: 220
 };
-
 
 const LUNAR_PHASES = {
   markers: {
@@ -52,29 +37,6 @@ const WEATHER = {
   pastDays: 2,
   futureDays: 4
 };
-
-/*
-const WEATHER = {
-  pastDays: 2,
-  futureDays: 4,
-  locationsByTimezone: {
-    'America/Phoenix': {
-      label: 'Phoenix, Arizona',
-      latitude: 33.4484,
-      longitude: -112.0740
-    },
-    'Australia/Brisbane': {
-      label: 'Brisbane, Queensland',
-      latitude: -27.4698,
-      longitude: 153.0251
-    },
-    'America/Toronto': {
-      label: 'Toronto, Ontario',
-      latitude: 43.6532,
-      longitude: -79.3832
-    }
-  }
-}; */
 
 function isFridayDateISO(dateISO){
   const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
@@ -134,29 +96,6 @@ const state = {
     weatherPendingKey: null,
   }
 };
-
-/*
-function ensureEastWestOrder(){
-  const now = DateTime.now();
-  const a = now.setZone(state.tamaraTZ);
-  const b = now.setZone(state.martinTZ);
-
-  if(a.offset === b.offset) return;
-
-  if(a.offset < b.offset){
-    [state.tamaraTZ, state.martinTZ] = [state.martinTZ, state.tamaraTZ];
-    [state.tamaraChoice, state.martinChoice] = [state.martinChoice, state.tamaraChoice];
-
-    const iA = el('tzTamara');
-    const iB = el('tzMartin');
-    if(iA && iB){
-      iA.value = state.tamaraChoice;
-      iB.value = state.martinChoice;
-    }
-  }
-}
-*/
-
 
 // --------------- Updated Helpers (simplified) ------------
 const AFDS_LOCATION_FEATURE = 'supportsAFdS';
