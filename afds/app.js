@@ -1335,6 +1335,11 @@ function renderDayView() {
   const deadToggle = clone.querySelector('.toggle');
   if (deadToggle) deadToggle.remove();
 
+  const flowerImg = clone.querySelector('.fridayflowers img');
+  if (flowerImg) {
+    attachFridayFlowerPreview(flowerImg);
+  }
+
   wrap.appendChild(clone);
   return wrap;
 }
@@ -3363,7 +3368,27 @@ function bindControls() {
     render();
   });
 
-  el('toggleGregorian')?.addEventListener('change', () => render());
+  const gregMain = el('toggleGregorian');
+  const gregMobile = el('toggleGregorianMobile');
+
+  function syncGregorianToggles(source) {
+    const checked = !!source.checked;
+    if (gregMain) gregMain.checked = checked;
+    if (gregMobile) gregMobile.checked = checked;
+    render();
+  }
+
+  if (gregMobile && gregMain) {
+    gregMobile.checked = gregMain.checked;
+  }
+
+  if (gregMain) {
+    gregMain.addEventListener('change', () => syncGregorianToggles(gregMain));
+  }
+
+  if (gregMobile) {
+    gregMobile.addEventListener('change', () => syncGregorianToggles(gregMobile));
+  }
 
   function applyZoneChoice(which, value) {
     if (which === 'display') {
