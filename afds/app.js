@@ -8,12 +8,12 @@ const DEFAULTS = {
   displayChoice: `TZ:${Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'}`,
 };
 
-const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 const FRIDAY_FLOWERS = {
   heading: 'Friday Flowers',
   basePath: './images/friday-flowers/',
-  count: 100,              // **** update this when you add more images ****
+  count: 100,
   extension: '.jpg',
   maxHeightPx: 220
 };
@@ -38,33 +38,28 @@ const WEATHER = {
   futureDays: 4
 };
 
-function isFridayDateISO(dateISO){
-  const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
-  return dt.weekday === 5; // Luxon: Mon=1 ... Fri=5 ... Sun=7
-}
+const MOBILE_BREAKPOINT = 1040;
 
-function fridayFlowerForDate(dateISO){
-  if(!isFridayDateISO(dateISO)) return null;
-  if(!FRIDAY_FLOWERS.count || FRIDAY_FLOWERS.count < 1) return null;
+const DESKTOP_VIEWS = [
+  { value: 'month', label: 'Month' },
+  { value: 'week',  label: 'Week'  },
+  { value: 'list',  label: 'List'  },
+  { value: 'year',  label: 'Year'  }
+];
 
-  const idx = (hash32_FNV1a(`FridayFlowers|${dateISO}`) % FRIDAY_FLOWERS.count) + 1;
-  const fileNo = String(idx).padStart(3, '0');
+const MOBILE_VIEWS = [
+  { value: 'month',  label: 'Month'  },
+  { value: 'week',   label: 'Week'   },
+  { value: 'day',    label: 'Day'    },
+  { value: 'list',   label: 'List'   },
+  { value: 'clocks', label: 'Clocks' }
+];
 
-  return {
-    heading: FRIDAY_FLOWERS.heading,
-    src: `${FRIDAY_FLOWERS.basePath}ff-${fileNo}${FRIDAY_FLOWERS.extension}`,
-    alt: `${FRIDAY_FLOWERS.heading} ${fileNo}`
-  };
-}
-
-// Luxon startOf('week') follows locale (often Monday). AFdS UI is SUN→SAT.
-function startOfWeekSunday(dt){
-  // Luxon weekday: 1=Mon ... 7=Sun
-  return dt.startOf('day').minus({days: dt.weekday % 7});
-}
-function endOfWeekSaturday(dt){
-  return startOfWeekSunday(dt).plus({days: 6}).endOf('day');
-}
+const AFDS_LOCATION_FEATURE = 'supportsAFdS';
+const WEATHER_LOCATION_FEATURE = 'supportsWeather';
+const DEFAULT_TAMARA_TZ = 'America/Phoenix';
+const DEFAULT_MARTIN_TZ = 'Australia/Brisbane';
+const DEFAULT_DISPLAY_TZ = 'UTC';
 
 const state = {
   view: 'month',
@@ -97,76 +92,142 @@ const state = {
   }
 };
 
-const MOBILE_BREAKPOINT = 1040;
+const el = (id) => document.getElementById(id);
 
-function isMobileAFDS(){
+// ---------- Basic helpers ----------
+function isMobileAFDS() {
   return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
 }
 
-function activateDate(dateISO){
+function currentViewOptions() {
+  return isMobileAFDS() ? MOBILE_VIEWS : DESKTOP_VIEWS;
+}
+
+function populateViewSelect() {
+  const sel = el('viewSelect');
+  if (!sel) return;
+
+  const opts = currentViewOptions();
+  const allowed = new Set(opts.map(o => o.value));
+
+  if (!allowed.has(state.view)) {
+    state.view = isMobileAFDS() ? 'day' : 'month';
+  }
+
+  sel.innerHTML = '';
+  for (const opt of opts) {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    sel.appendChild(o);
+  }
+
+  sel.value = state.view;
+}
+
+function handleViewportModeChange() {
+  const before = state.view;
+  populateViewSelect();
+
+  if (state.view !== before) {
+    if (state.view === 'day') {
+      snapshotDay(state.focusDateISO);
+      return;
+    }
+    render();
+    return;
+  }
+
+  render();
+}
+
+function activateDate(dateISO) {
   state.focusDateISO = dateISO;
 
-  if(isMobileAFDS()){
+  if (isMobileAFDS()) {
     state.view = 'day';
+    const sel = el('viewSelect');
+    if (sel) sel.value = 'day';
   }
 
   snapshotDay(dateISO);
 }
 
-// --------------- Updated Helpers (simplified) ------------
-const AFDS_LOCATION_FEATURE = 'supportsAFdS';
-const WEATHER_LOCATION_FEATURE = 'supportsWeather';
-const DEFAULT_TAMARA_TZ = 'America/Phoenix';
-const DEFAULT_MARTIN_TZ = 'Australia/Brisbane';
-const DEFAULT_DISPLAY_TZ = 'UTC';
+function isFridayDateISO(dateISO) {
+  const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
+  return dt.weekday === 5;
+}
 
-function locationHelpers(){
+function fridayFlowerForDate(dateISO) {
+  if (!isFridayDateISO(dateISO)) return null;
+  if (!FRIDAY_FLOWERS.count || FRIDAY_FLOWERS.count < 1) return null;
+
+  const idx = (hash32_FNV1a(`FridayFlowers|${dateISO}`) % FRIDAY_FLOWERS.count) + 1;
+  const fileNo = String(idx).padStart(3, '0');
+
+  return {
+    heading: FRIDAY_FLOWERS.heading,
+    src: `${FRIDAY_FLOWERS.basePath}ff-${fileNo}${FRIDAY_FLOWERS.extension}`,
+    alt: `${FRIDAY_FLOWERS.heading} ${fileNo}`
+  };
+}
+
+function startOfWeekSunday(dt) {
+  return dt.startOf('day').minus({ days: dt.weekday % 7 });
+}
+
+function endOfWeekSaturday(dt) {
+  return startOfWeekSunday(dt).plus({ days: 6 }).endOf('day');
+}
+
+// ---------- Location helpers ----------
+function locationHelpers() {
   return window.ABHLSD_LOCATION_HELPERS || null;
 }
 
-function resolveChoice(choice, featureName = AFDS_LOCATION_FEATURE){
+function resolveChoice(choice, featureName = AFDS_LOCATION_FEATURE) {
   const helpers = locationHelpers();
-  if(!helpers?.resolveSelection) return null;
+  if (!helpers?.resolveSelection) return null;
   return helpers.resolveSelection(choice, featureName);
 }
 
-function timezoneFromChoice(choice, fallbackTZ = DEFAULT_DISPLAY_TZ){
+function timezoneFromChoice(choice, fallbackTZ = DEFAULT_DISPLAY_TZ) {
   return resolveChoice(choice)?.timezone || fallbackTZ;
 }
 
-function locationFromChoice(choice, featureName = WEATHER_LOCATION_FEATURE){
+function locationFromChoice(choice, featureName = WEATHER_LOCATION_FEATURE) {
   const helpers = locationHelpers();
-  if(!helpers) return null;
+  if (!helpers) return null;
 
   const resolved = helpers.resolveSelection?.(choice, featureName);
-  if(resolved?.location) return resolved.location;
+  if (resolved?.location) return resolved.location;
 
-  if(resolved?.timezone && helpers.getPrimaryLocationForTimezone){
+  if (resolved?.timezone && helpers.getPrimaryLocationForTimezone) {
     return helpers.getPrimaryLocationForTimezone(resolved.timezone, featureName) || null;
   }
 
   return null;
 }
 
-function weatherLocationForDisplayTZ(){
+function weatherLocationForDisplayTZ() {
   return locationFromChoice(state.displayChoice, WEATHER_LOCATION_FEATURE);
 }
 
-function syncTZStateFromChoices(){
+function syncTZStateFromChoices() {
   state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, DEFAULT_TAMARA_TZ);
   state.martinTZ = timezoneFromChoice(state.martinChoice, DEFAULT_MARTIN_TZ);
   state.displayTZ = timezoneFromChoice(state.displayChoice, DEFAULT_DISPLAY_TZ);
 }
 
-function fillHybridSelect(sel, options, currentChoice, fallbackChoice){
-  if(!sel) return;
+function fillHybridSelect(sel, options, currentChoice, fallbackChoice) {
+  if (!sel) return;
 
   sel.innerHTML = '';
 
   const locGroup = document.createElement('optgroup');
   locGroup.label = 'Locations';
 
-  for(const item of options.locations){
+  for (const item of options.locations) {
     const opt = document.createElement('option');
     opt.value = item.value;
     opt.textContent = item.label;
@@ -176,7 +237,7 @@ function fillHybridSelect(sel, options, currentChoice, fallbackChoice){
   const tzGroup = document.createElement('optgroup');
   tzGroup.label = 'Time zones';
 
-  for(const item of options.timezones){
+  for (const item of options.timezones) {
     const opt = document.createElement('option');
     opt.value = item.value;
     opt.textContent = item.label;
@@ -195,9 +256,9 @@ function fillHybridSelect(sel, options, currentChoice, fallbackChoice){
   sel.value = allowed.has(chosen) ? chosen : '';
 }
 
-function setUpTZList(){
+function setUpTZList() {
   const helpers = locationHelpers();
-  if(!helpers?.getHybridOptionsFor) return;
+  if (!helpers?.getHybridOptionsFor) return;
 
   const options = helpers.getHybridOptionsFor(AFDS_LOCATION_FEATURE, {
     includeAllIana: true,
@@ -208,132 +269,31 @@ function setUpTZList(){
   fillHybridSelect(el('tzMartin'), options, state.martinChoice, DEFAULTS.martinChoice);
   fillHybridSelect(el('displayTZ'), options, state.displayChoice, DEFAULTS.displayChoice);
 
-  /*
-  fillHybridSelect(el('tzTamara'), state.tamaraChoice, state.tamaraChoice, DEFAULTS.tamaraChoice);
-  fillHybridSelect(el('tzMartin'), state.martinChoice, state.martinChoice, DEFAULTS.martinChoice);
-  fillHybridSelect(el('displayTZ'), state.displayChoice, state.displayChoice, DEFAULTS.displayChoice);
-  */
-
   syncTZStateFromChoices();
   ensureEastWestOrder();
 }
 
-function ensureEastWestOrder(){
+function ensureEastWestOrder() {
   const now = DateTime.now();
   const a = now.setZone(state.tamaraTZ);
   const b = now.setZone(state.martinTZ);
 
-  if(a.offset === b.offset) return;
+  if (a.offset === b.offset) return;
 
-  if(a.offset < b.offset){
+  if (a.offset < b.offset) {
     [state.tamaraTZ, state.martinTZ] = [state.martinTZ, state.tamaraTZ];
     [state.tamaraChoice, state.martinChoice] = [state.martinChoice, state.tamaraChoice];
 
     const tamaraSel = el('tzTamara');
     const martinSel = el('tzMartin');
 
-    if(tamaraSel) tamaraSel.value = state.tamaraChoice;
-    if(martinSel) martinSel.value = state.martinChoice;
+    if (tamaraSel) tamaraSel.value = state.tamaraChoice;
+    if (martinSel) martinSel.value = state.martinChoice;
   }
 }
 
-/*
-// --------------- Time Zone Setup Helpers ----------
-
-function setUpTZList(){
-  const helpers = locationHelpers();
-  if(!helpers?.getHybridOptionsFor) return;
-
-  const options = helpers.getHybridOptionsFor('supportsAFdS', {
-    includeAllIana: true,
-    includeUTC: true
-  });
-
-  function fillHybridSelect(sel, currentChoice, fallbackChoice){
-    if(!sel) return;
-    sel.innerHTML = '';
-
-    const locGroup = document.createElement('optgroup');
-    locGroup.label = 'Locations';
-
-    for(const item of options.locations){
-      const opt = document.createElement('option');
-      opt.value = item.value;
-      opt.textContent = item.label;
-      locGroup.appendChild(opt);
-    }
-
-    const tzGroup = document.createElement('optgroup');
-    tzGroup.label = 'Time zones';
-
-    for(const item of options.timezones){
-      const opt = document.createElement('option');
-      opt.value = item.value;
-      opt.textContent = item.label;
-      tzGroup.appendChild(opt);
-    }
-
-    sel.appendChild(locGroup);
-    sel.appendChild(tzGroup);
-
-    const allValues = new Set([
-      ...options.locations.map(x => x.value),
-      ...options.timezones.map(x => x.value)
-    ]);
-
-    const chosen = allValues.has(currentChoice) ? currentChoice : fallbackChoice;
-    sel.value = allValues.has(chosen) ? chosen : '';
-  }
-
-  fillHybridSelect(el('tzTamara'), state.tamaraChoice, DEFAULTS.tamaraChoice);
-  fillHybridSelect(el('tzMartin'), state.martinChoice, DEFAULTS.martinChoice);
-  fillHybridSelect(el('displayTZ'), state.displayChoice, DEFAULTS.displayChoice);
-
-  state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
-  state.martinTZ = timezoneFromChoice(state.martinChoice, 'Australia/Brisbane');
-  state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
-
-  ensureEastWestOrder();
-}
-
-// ---------- Location Helpers ----------
-function locationHelpers(){
-  return window.ABHLSD_LOCATION_HELPERS || null;
-}
-
-function resolveAFdSChoice(choice, featureName = 'supportsAFdS'){
-  const helpers = locationHelpers();
-  if(!helpers?.resolveSelection) return null;
-  return helpers.resolveSelection(choice, featureName);
-}
-
-function timezoneFromChoice(choice, fallbackTZ = 'UTC'){
-  const resolved = resolveAFdSChoice(choice, 'supportsAFdS');
-  return resolved?.timezone || fallbackTZ;
-}
-
-function locationFromChoice(choice, featureName = 'supportsWeather'){
-  const helpers = locationHelpers();
-  if(!helpers) return null;
-
-  const resolved = helpers.resolveSelection?.(choice, featureName);
-  if(resolved?.location) return resolved.location;
-
-  if(resolved?.timezone && helpers.getPrimaryLocationForTimezone){
-    return helpers.getPrimaryLocationForTimezone(resolved.timezone, featureName) || null;
-  }
-
-  return null;
-}
-
-// ------------- weather functions --------------- 
-
-function weatherLocationForDisplayTZ(){
-  return locationFromChoice(state.displayChoice, 'supportsWeather');
-}
-*/
-
-function weatherWindowForDisplayTZ(){
+// ---------- Weather ----------
+function weatherWindowForDisplayTZ() {
   const today = DateTime.now().setZone(state.displayTZ).startOf('day');
   return {
     startISO: today.minus({ days: WEATHER.pastDays }).toISODate(),
@@ -341,62 +301,62 @@ function weatherWindowForDisplayTZ(){
   };
 }
 
-function weatherIconForCode(code){
+function weatherIconForCode(code) {
   const n = Number(code);
 
-  if(n === 0) return '☀';
-  if(n === 1 || n === 2) return '⛅';
-  if(n === 3) return '☁';
-  if(n === 45 || n === 48) return '🌫';
-  if([51,53,55,56,57].includes(n)) return '🌦';
-  if([61,63,65,66,67].includes(n)) return '🌧';
-  if([71,73,75,77].includes(n)) return '❄';
-  if([80,81,82].includes(n)) return '🌦';
-  if([85,86].includes(n)) return '🌨';
-  if([95,96,99].includes(n)) return '⛈';
+  if (n === 0) return '☀';
+  if (n === 1 || n === 2) return '⛅';
+  if (n === 3) return '☁';
+  if (n === 45 || n === 48) return '🌫';
+  if ([51, 53, 55, 56, 57].includes(n)) return '🌦';
+  if ([61, 63, 65, 66, 67].includes(n)) return '🌧';
+  if ([71, 73, 75, 77].includes(n)) return '❄';
+  if ([80, 81, 82].includes(n)) return '🌦';
+  if ([85, 86].includes(n)) return '🌨';
+  if ([95, 96, 99].includes(n)) return '⛈';
 
   return '•';
 }
 
-function weatherSummaryForCode(code){
+function weatherSummaryForCode(code) {
   const n = Number(code);
 
-  if(n === 0) return 'Clear';
-  if(n === 1) return 'Mainly clear';
-  if(n === 2) return 'Partly cloudy';
-  if(n === 3) return 'Overcast';
-  if(n === 45 || n === 48) return 'Fog';
-  if([51,53,55].includes(n)) return 'Drizzle';
-  if([56,57].includes(n)) return 'Freezing drizzle';
-  if([61,63,65].includes(n)) return 'Rain';
-  if([66,67].includes(n)) return 'Freezing rain';
-  if([71,73,75,77].includes(n)) return 'Snow';
-  if([80,81,82].includes(n)) return 'Rain showers';
-  if([85,86].includes(n)) return 'Snow showers';
-  if([95,96,99].includes(n)) return 'Thunderstorm';
+  if (n === 0) return 'Clear';
+  if (n === 1) return 'Mainly clear';
+  if (n === 2) return 'Partly cloudy';
+  if (n === 3) return 'Overcast';
+  if (n === 45 || n === 48) return 'Fog';
+  if ([51, 53, 55].includes(n)) return 'Drizzle';
+  if ([56, 57].includes(n)) return 'Freezing drizzle';
+  if ([61, 63, 65].includes(n)) return 'Rain';
+  if ([66, 67].includes(n)) return 'Freezing rain';
+  if ([71, 73, 75, 77].includes(n)) return 'Snow';
+  if ([80, 81, 82].includes(n)) return 'Rain showers';
+  if ([85, 86].includes(n)) return 'Snow showers';
+  if ([95, 96, 99].includes(n)) return 'Thunderstorm';
 
   return 'Weather';
 }
 
-function formatWeatherTemp(v){
+function formatWeatherTemp(v) {
   return Number.isFinite(v) ? `${Math.round(v)}°` : '—';
 }
 
-function weatherTitleForEntry(entry){
-  if(!entry) return '';
+function weatherTitleForEntry(entry) {
+  if (!entry) return '';
 
   const bits = [entry.summary];
 
-  if(Number.isFinite(entry.tempMax)) bits.push(`Max ${Math.round(entry.tempMax)}°`);
-  if(Number.isFinite(entry.tempMin)) bits.push(`Min ${Math.round(entry.tempMin)}°`);
-  if(Number.isFinite(entry.precipitationSum)) bits.push(`Rain ${entry.precipitationSum} mm`);
+  if (Number.isFinite(entry.tempMax)) bits.push(`Max ${Math.round(entry.tempMax)}°`);
+  if (Number.isFinite(entry.tempMin)) bits.push(`Min ${Math.round(entry.tempMin)}°`);
+  if (Number.isFinite(entry.precipitationSum)) bits.push(`Rain ${entry.precipitationSum} mm`);
 
   return bits.join(' • ');
 }
 
-function weatherSourceUrlForDisplayTZ(){
+function weatherSourceUrlForDisplayTZ() {
   const loc = weatherLocationForDisplayTZ();
-  if(!loc) return '';
+  if (!loc) return '';
 
   const params = new URLSearchParams({
     latitude: String(loc.latitude),
@@ -410,19 +370,19 @@ function weatherSourceUrlForDisplayTZ(){
   return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
 }
 
-async function refreshWeatherCache(force = false){
+async function refreshWeatherCache(force = false) {
   const loc = weatherLocationForDisplayTZ();
-  const window = weatherWindowForDisplayTZ();
+  const windowRange = weatherWindowForDisplayTZ();
 
-  const unsupportedKey = `unsupported|${state.displayTZ}|${window.startISO}|${window.endISO}`;
+  const unsupportedKey = `unsupported|${state.displayTZ}|${windowRange.startISO}|${windowRange.endISO}`;
 
-  if(!loc){
+  if (!loc) {
     state.data.weather = {
       cacheKey: unsupportedKey,
       zone: state.displayTZ,
       location: null,
-      startISO: window.startISO,
-      endISO: window.endISO,
+      startISO: windowRange.startISO,
+      endISO: windowRange.endISO,
       byDate: new Map(),
       unsupported: true,
       error: null,
@@ -435,23 +395,23 @@ async function refreshWeatherCache(force = false){
     state.displayTZ,
     loc.latitude,
     loc.longitude,
-    window.startISO,
-    window.endISO
+    windowRange.startISO,
+    windowRange.endISO
   ].join('|');
 
   const existing = state.data.weather;
-  if(
+  if (
     !force &&
     existing &&
     existing.cacheKey === cacheKey &&
     existing.byDate instanceof Map
-  ){
+  ) {
     return;
   }
 
   state.data.weatherPendingKey = cacheKey;
 
-  try{
+  try {
     const params = new URLSearchParams({
       latitude: String(loc.latitude),
       longitude: String(loc.longitude),
@@ -465,19 +425,19 @@ async function refreshWeatherCache(force = false){
       cache: 'no-store'
     });
 
-    if(!res.ok){
+    if (!res.ok) {
       throw new Error(`Weather request failed (${res.status})`);
     }
 
     const json = await res.json();
 
-    if(state.data.weatherPendingKey !== cacheKey) return;
+    if (state.data.weatherPendingKey !== cacheKey) return;
 
     const daily = json?.daily || {};
     const dates = Array.isArray(daily.time) ? daily.time : [];
     const byDate = new Map();
 
-    for(let i = 0; i < dates.length; i++){
+    for (let i = 0; i < dates.length; i++) {
       const dateISO = dates[i];
       const weatherCode = Number(daily.weather_code?.[i] ?? NaN);
 
@@ -509,22 +469,22 @@ async function refreshWeatherCache(force = false){
       cacheKey,
       zone: state.displayTZ,
       location: loc,
-      startISO: window.startISO,
-      endISO: window.endISO,
+      startISO: windowRange.startISO,
+      endISO: windowRange.endISO,
       byDate,
       unsupported: false,
       error: null,
       fetchedAt: DateTime.now().toISO()
     };
-  }catch(err){
-    if(state.data.weatherPendingKey !== cacheKey) return;
+  } catch (err) {
+    if (state.data.weatherPendingKey !== cacheKey) return;
 
     state.data.weather = {
       cacheKey,
       zone: state.displayTZ,
       location: loc,
-      startISO: window.startISO,
-      endISO: window.endISO,
+      startISO: windowRange.startISO,
+      endISO: windowRange.endISO,
       byDate: new Map(),
       unsupported: false,
       error: String(err?.message || err || 'Unknown weather error'),
@@ -532,23 +492,23 @@ async function refreshWeatherCache(force = false){
     };
   }
 
-  if(state.snapshot?.dateISO){
+  if (state.snapshot?.dateISO) {
     snapshotDay(state.snapshot.dateISO);
-  }else{
+  } else {
     render();
   }
 }
 
-function weatherForDate(dateISO){
+function weatherForDate(dateISO) {
   const weather = state.data.weather;
-  if(!weather) return null;
-  if(weather.zone !== state.displayTZ) return null;
+  if (!weather) return null;
+  if (weather.zone !== state.displayTZ) return null;
   return weather.byDate?.get(dateISO) || null;
 }
 
-function buildWeatherMarkerEl(dateISO, opts = {}){
+function buildWeatherMarkerEl(dateISO, opts = {}) {
   const entry = weatherForDate(dateISO);
-  if(!entry) return null;
+  if (!entry) return null;
 
   const compact = opts.compact !== false;
 
@@ -568,7 +528,7 @@ function buildWeatherMarkerEl(dateISO, opts = {}){
   marker.style.fontSize = compact ? '12px' : '14px';
   wrap.appendChild(marker);
 
-  if(!compact){
+  if (!compact) {
     const txt = document.createElement('span');
     txt.textContent = `${formatWeatherTemp(entry.tempMax)}/${formatWeatherTemp(entry.tempMin)}`;
     txt.style.fontSize = '11px';
@@ -581,37 +541,37 @@ function buildWeatherMarkerEl(dateISO, opts = {}){
 }
 
 // ---------- Utilities ----------
-function parseCSV(text){
+function parseCSV(text) {
   const rows = [];
   let row = [];
   let cur = '';
   let inQuotes = false;
 
-  for(let i=0;i<text.length;i++){
+  for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    const next = text[i+1];
+    const next = text[i + 1];
 
-    if(inQuotes){
-      if(ch === '"' && next === '"'){ cur += '"'; i++; continue; }
-      if(ch === '"'){ inQuotes = false; continue; }
+    if (inQuotes) {
+      if (ch === '"' && next === '"') { cur += '"'; i++; continue; }
+      if (ch === '"') { inQuotes = false; continue; }
       cur += ch;
       continue;
     }
 
-    if(ch === '"'){ inQuotes = true; continue; }
-    if(ch === ','){ row.push(cur); cur=''; continue; }
+    if (ch === '"') { inQuotes = true; continue; }
+    if (ch === ',') { row.push(cur); cur = ''; continue; }
 
-    if(ch === '\r'){
-      if(next === '\n') i++;
-      row.push(cur); cur='';
-      if(row.length > 1 || row[0] !== '') rows.push(row);
+    if (ch === '\r') {
+      if (next === '\n') i++;
+      row.push(cur); cur = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
       row = [];
       continue;
     }
 
-    if(ch === '\n'){
-      row.push(cur); cur='';
-      if(row.length > 1 || row[0] !== '') rows.push(row);
+    if (ch === '\n') {
+      row.push(cur); cur = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
       row = [];
       continue;
     }
@@ -620,19 +580,19 @@ function parseCSV(text){
   }
 
   row.push(cur);
-  if(row.length > 1 || row[0] !== '') rows.push(row);
-  if(rows.length === 0) return [];
+  if (row.length > 1 || row[0] !== '') rows.push(row);
+  if (rows.length === 0) return [];
 
   const headers = rows[0].map(h => h.trim());
-  if(headers.length && headers[0].startsWith('\ufeff')){
+  if (headers.length && headers[0].startsWith('\ufeff')) {
     headers[0] = headers[0].replace(/^\ufeff/, '');
   }
 
   const out = [];
-  for(let r=1;r<rows.length;r++){
-    if(rows[r].every(v => String(v).trim() === '')) continue;
+  for (let r = 1; r < rows.length; r++) {
+    if (rows[r].every(v => String(v).trim() === '')) continue;
     const obj = {};
-    for(let c=0;c<headers.length;c++){
+    for (let c = 0; c < headers.length; c++) {
       obj[headers[c]] = (rows[r][c] ?? '').trim();
     }
     out.push(obj);
@@ -641,157 +601,157 @@ function parseCSV(text){
   return out;
 }
 
-async function fetchTextFirstAvailable(paths){
-  for(const path of paths){
-    try{
+async function fetchTextFirstAvailable(paths) {
+  for (const path of paths) {
+    try {
       const res = await fetch(path, { cache: 'no-store' });
-      if(res.ok) return await res.text();
-    }catch(e){}
+      if (res.ok) return await res.text();
+    } catch (e) {}
   }
   return '';
 }
 
-function pickField(row, candidates){
-  for(const key of candidates){
+function pickField(row, candidates) {
+  for (const key of candidates) {
     const v = row?.[key];
-    if(v !== undefined && v !== null && String(v).trim() !== ''){
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
       return String(v).trim();
     }
   }
   return '';
 }
 
-function toBool(v){
-  if(typeof v === 'boolean') return v;
+function toBool(v) {
+  if (typeof v === 'boolean') return v;
   const s = String(v ?? '').trim().toLowerCase();
   return (s === 'true' || s === '1' || s === 'yes' || s === 'y');
 }
 
-function toBoolDefault(v, def){
+function toBoolDefault(v, def) {
   const s = String(v ?? '').trim();
-  if(s === '') return def;
+  if (s === '') return def;
   return toBool(s);
 }
 
-function categoryKey(c){ return (c ?? '').toString().trim().toLowerCase(); }
-function isSpecialCategory(c){ return categoryKey(c).startsWith('special'); }
-function isStandardCategory(c){ return categoryKey(c).startsWith('standard'); }
+function categoryKey(c) { return (c ?? '').toString().trim().toLowerCase(); }
+function isSpecialCategory(c) { return categoryKey(c).startsWith('special'); }
+function isStandardCategory(c) { return categoryKey(c).startsWith('standard'); }
 
-function toInt(v, def=null){
+function toInt(v, def = null) {
   const n = parseInt(String(v ?? '').trim(), 10);
   return Number.isFinite(n) ? n : def;
 }
 
-function parseMonthDayFlexible(s){
+function parseMonthDayFlexible(s) {
   const dt = parseDateTimeFlexible(s, 'UTC');
-  if(!dt || !dt.isValid) return { month:null, day:null };
+  if (!dt || !dt.isValid) return { month: null, day: null };
   return { month: dt.month, day: dt.day };
 }
 
-function parseDateTimeFlexible(s, zone){
+function parseDateTimeFlexible(s, zone) {
   const str = String(s ?? '').trim();
-  if(!str) return null;
+  if (!str) return null;
 
   let dt = null;
 
-  if(str.includes('T')){
-    dt = DateTime.fromISO(str, {zone});
-    if(dt.isValid) return dt;
+  if (str.includes('T')) {
+    dt = DateTime.fromISO(str, { zone });
+    if (dt.isValid) return dt;
   }
 
-  dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm:ss', {zone});
-  if(dt.isValid) return dt;
+  dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm:ss', { zone });
+  if (dt.isValid) return dt;
 
-  dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm', {zone});
-  if(dt.isValid) return dt;
+  dt = DateTime.fromFormat(str, 'yyyy-MM-dd HH:mm', { zone });
+  if (dt.isValid) return dt;
 
-  dt = DateTime.fromISO(str, {zone});
-  if(dt.isValid) return dt;
+  dt = DateTime.fromISO(str, { zone });
+  if (dt.isValid) return dt;
 
   return null;
 }
 
-function fmtTimeHHMM(dt){ return dt.toFormat('HH:mm'); }
-function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtTimeHHMM(dt) { return dt.toFormat('HH:mm'); }
+function pad2(n) { return String(n).padStart(2, '0'); }
 
-function fmtGreg(dateISO){
-  const [y,m,d] = dateISO.split('-').map(Number);
+function fmtGreg(dateISO) {
+  const [y, m, d] = dateISO.split('-').map(Number);
   return `${pad2(d)}/${pad2(m)}/${y}`;
 }
 
-function seoianYearForGregorian(dateISO){
-  const [y,m,d] = dateISO.split('-').map(Number);
-  if(m > 1 || (m === 1 && d >= 19)) return y - 1993;
+function seoianYearForGregorian(dateISO) {
+  const [y, m, d] = dateISO.split('-').map(Number);
+  if (m > 1 || (m === 1 && d >= 19)) return y - 1993;
   return y - 1994;
 }
 
-function seoianLabelWithOverlaps(dateISO){
+function seoianLabelWithOverlaps(dateISO) {
   const sy = seoianYearForGregorian(dateISO);
   const act = activeSuperMonths(dateISO);
-  if(!act || act.length === 0) return '—';
+  if (!act || act.length === 0) return '—';
 
-  const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+  const dUTC = DateTime.fromISO(dateISO, { zone: 'UTC' }).startOf('day');
   const labels = act.map(r => {
-    const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
+    const startUTC = DateTime.fromISO(r.start, { zone: 'UTC' }).startOf('day');
     const day = dUTC.diff(startUTC, 'days').days + 1;
     const dayInt = Math.floor(day + 1e-9);
     return {
       start: r.start,
-      label: `${pad2(dayInt)}/${pad2(r.monthNo)}/${String(sy).padStart(4,'0')}`
+      label: `${pad2(dayInt)}/${pad2(r.monthNo)}/${String(sy).padStart(4, '0')}`
     };
   });
 
-  labels.sort((a,b)=> a.start.localeCompare(b.start));
+  labels.sort((a, b) => a.start.localeCompare(b.start));
   const canonical = labels[labels.length - 1];
   const overlaps = labels.slice(0, -1).map(x => x.label);
 
   return overlaps.length ? `${canonical.label} | ${overlaps.join(' | ')}` : canonical.label;
 }
 
-function dateISOFromDMY(dmy){
+function dateISOFromDMY(dmy) {
   const m = dmy.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if(!m) return null;
+  if (!m) return null;
 
   const d = Number(m[1]);
   const mo = Number(m[2]);
   const y = Number(m[3]);
 
-  const dt = DateTime.fromObject({year:y, month:mo, day:d}, {zone:'UTC'});
-  if(!dt.isValid) return null;
+  const dt = DateTime.fromObject({ year: y, month: mo, day: d }, { zone: 'UTC' });
+  if (!dt.isValid) return null;
   return dt.toISODate();
 }
 
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
-function roundHalfUp(x){ return Math.floor(x + 0.5); }
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function roundHalfUp(x) { return Math.floor(x + 0.5); }
 
-function eastWestZones(dateISO, tzA, tzB){
-  if(tzA === tzB) return { east: tzA, west: tzA, same:true };
+function eastWestZones(dateISO, tzA, tzB) {
+  if (tzA === tzB) return { east: tzA, west: tzA, same: true };
 
-  const a = DateTime.fromISO(dateISO, {zone:tzA}).startOf('day');
-  const b = DateTime.fromISO(dateISO, {zone:tzB}).startOf('day');
+  const a = DateTime.fromISO(dateISO, { zone: tzA }).startOf('day');
+  const b = DateTime.fromISO(dateISO, { zone: tzB }).startOf('day');
 
-  if(a.offset === b.offset) return { east: tzA, west: tzA, same:true };
+  if (a.offset === b.offset) return { east: tzA, west: tzA, same: true };
   return (a.offset > b.offset)
-    ? { east: tzA, west: tzB, same:false }
-    : { east: tzB, west: tzA, same:false };
+    ? { east: tzA, west: tzB, same: false }
+    : { east: tzB, west: tzA, same: false };
 }
 
-function superDayBounds(dateISO, tzA, tzB){
+function superDayBounds(dateISO, tzA, tzB) {
   const { east, west, same } = eastWestZones(dateISO, tzA, tzB);
-  const start = DateTime.fromISO(dateISO, {zone:east}).startOf('day');
-  const end = DateTime.fromISO(dateISO, {zone:west}).endOf('day');
+  const start = DateTime.fromISO(dateISO, { zone: east }).startOf('day');
+  const end = DateTime.fromISO(dateISO, { zone: west }).endOf('day');
   const durMs = end.toUTC().toMillis() - start.toUTC().toMillis();
   return { dateISO, east, west, same, start, end, durMs };
 }
 
-function durationToHHMMCeil30(ms){
+function durationToHHMMCeil30(ms) {
   const minutes = Math.ceil((ms / 60000) / 30) * 30;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function superDayFactsForDate(dateISO, easternTZ, westernTZ){
+function superDayFactsForDate(dateISO, easternTZ, westernTZ) {
   const b = superDayBounds(dateISO, easternTZ, westernTZ);
   return {
     east: b.east,
@@ -802,18 +762,18 @@ function superDayFactsForDate(dateISO, easternTZ, westernTZ){
   };
 }
 
-function durationToHHMM(ms){
+function durationToHHMM(ms) {
   const totalMin = Math.floor(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   return `${h}:${pad2(m)}`;
 }
 
-function ceilToHalfHourHours(hours){
+function ceilToHalfHourHours(hours) {
   return Math.ceil(hours * 2) / 2;
 }
 
-function durationToHHMMCeilHalfHour(ms){
+function durationToHHMMCeilHalfHour(ms) {
   const totalMin = ms / 60000;
   const roundedMin = Math.ceil(totalMin / 30) * 30;
   const h = Math.floor(roundedMin / 60);
@@ -821,61 +781,61 @@ function durationToHHMMCeilHalfHour(ms){
   return `${h}:${pad2(m)}`;
 }
 
-function monthTitle(dateISO, displayTZ){
-  const dt = DateTime.fromISO(dateISO, {zone:displayTZ});
+function monthTitle(dateISO, displayTZ) {
+  const dt = DateTime.fromISO(dateISO, { zone: displayTZ });
   return dt.toFormat('LLLL yyyy');
 }
 
-
-function lunarPhaseKeyFromQuarter(quarter){
+// ---------- Lunar ----------
+function lunarPhaseKeyFromQuarter(quarter) {
   return ['new', 'first', 'full', 'last'][quarter] || null;
 }
 
-function lunarMarkerForQuarter(quarter){
+function lunarMarkerForQuarter(quarter) {
   const key = lunarPhaseKeyFromQuarter(quarter);
   return key ? (LUNAR_PHASES.markers[key] || '•') : '•';
 }
 
-function lunarPhaseNameForQuarter(quarter){
+function lunarPhaseNameForQuarter(quarter) {
   const key = lunarPhaseKeyFromQuarter(quarter);
   return key ? (LUNAR_PHASES.names[key] || 'Lunar Phase') : 'Lunar Phase';
 }
 
-function buildLunarPhaseCache(){
+function buildLunarPhaseCache() {
   const ranges = state.data.ranges || [];
   const zone = state.displayTZ || 'UTC';
 
   let minISO = null;
   let maxISO = null;
 
-  for(const r of ranges){
-    if(!minISO || r.start < minISO) minISO = r.start;
-    if(!maxISO || r.end > maxISO) maxISO = r.end;
+  for (const r of ranges) {
+    if (!minISO || r.start < minISO) minISO = r.start;
+    if (!maxISO || r.end > maxISO) maxISO = r.end;
   }
 
   const startUTC = minISO
-    ? DateTime.fromISO(minISO, {zone:'UTC'}).minus({days:40}).startOf('day')
-    : DateTime.now().toUTC().minus({days:400}).startOf('day');
+    ? DateTime.fromISO(minISO, { zone: 'UTC' }).minus({ days: 40 }).startOf('day')
+    : DateTime.now().toUTC().minus({ days: 400 }).startOf('day');
 
   const endUTC = maxISO
-    ? DateTime.fromISO(maxISO, {zone:'UTC'}).plus({days:40}).endOf('day')
-    : DateTime.now().toUTC().plus({days:400}).endOf('day');
+    ? DateTime.fromISO(maxISO, { zone: 'UTC' }).plus({ days: 40 }).endOf('day')
+    : DateTime.now().toUTC().plus({ days: 400 }).endOf('day');
 
   const byDate = new Map();
   const events = [];
-  const searchStart = startUTC.minus({minutes:1}).toJSDate();
+  const searchStart = startUTC.minus({ minutes: 1 }).toJSDate();
   const limitMs = endUTC.toMillis();
 
   let mq = Astronomy.SearchMoonQuarter(searchStart);
 
-  while(mq && mq.time && mq.time.date && mq.time.date.getTime() <= limitMs){
+  while (mq && mq.time && mq.time.date && mq.time.date.getTime() <= limitMs) {
     const quarter = mq.quarter;
     const phaseKey = lunarPhaseKeyFromQuarter(quarter);
 
-    if(phaseKey){
+    if (phaseKey) {
       const utcDate = mq.time.date;
       const utcMs = utcDate.getTime();
-      const localDT = DateTime.fromJSDate(utcDate, {zone:'utc'}).setZone(zone);
+      const localDT = DateTime.fromJSDate(utcDate, { zone: 'utc' }).setZone(zone);
       const dateISO = localDT.toISODate();
 
       const event = {
@@ -892,7 +852,7 @@ function buildLunarPhaseCache(){
         localLabel: `${localDT.toFormat('dd/LL/yyyy HH:mm')} ${zone}`
       };
 
-      if(!byDate.has(dateISO)) byDate.set(dateISO, []);
+      if (!byDate.has(dateISO)) byDate.set(dateISO, []);
       byDate.get(dateISO).push(event);
       events.push(event);
     }
@@ -900,106 +860,106 @@ function buildLunarPhaseCache(){
     mq = Astronomy.NextMoonQuarter(mq);
   }
 
-  for(const [, arr] of byDate.entries()){
-    arr.sort((a,b)=> a.utcMs - b.utcMs);
+  for (const [, arr] of byDate.entries()) {
+    arr.sort((a, b) => a.utcMs - b.utcMs);
   }
 
   state.data.lunarPhases = { zone, byDate, events };
 }
 
-function lunarPhasesForDate(dateISO){
-  if(!state.data.lunarPhases || state.data.lunarPhases.zone !== state.displayTZ){
+function lunarPhasesForDate(dateISO) {
+  if (!state.data.lunarPhases || state.data.lunarPhases.zone !== state.displayTZ) {
     buildLunarPhaseCache();
   }
   return state.data.lunarPhases?.byDate?.get(dateISO) || [];
 }
 
 // ---------- Data: SuperMonth ranges ----------
-function buildRangesIndex(ranges){
+function buildRangesIndex(ranges) {
   const byYear = new Map();
   const monthNoByName = new Map();
   const nameByMonthNo = new Map();
 
-  for(const r of ranges){
+  for (const r of ranges) {
     monthNoByName.set(r.monthName, r.monthNo);
     nameByMonthNo.set(r.monthNo, r.monthName);
 
-    if(!byYear.has(r.seoianYear)) byYear.set(r.seoianYear, []);
+    if (!byYear.has(r.seoianYear)) byYear.set(r.seoianYear, []);
     byYear.get(r.seoianYear).push(r);
   }
 
-  for(const [, arr] of byYear.entries()){
-    arr.sort((a,b)=> a.start.localeCompare(b.start));
+  for (const [, arr] of byYear.entries()) {
+    arr.sort((a, b) => a.start.localeCompare(b.start));
   }
 
   return { byYear, monthNoByName, nameByMonthNo };
 }
 
-function activeSuperMonths(dateISO){
-  if(!state.data.rangesBySeoYear) return [];
+function activeSuperMonths(dateISO) {
+  if (!state.data.rangesBySeoYear) return [];
   const sy = seoianYearForGregorian(dateISO);
   const arr = state.data.rangesBySeoYear.get(sy) || [];
   return arr.filter(r => r.start <= dateISO && dateISO <= r.end);
 }
 
-function getRangeForMonth(seoYear, monthNo){
+function getRangeForMonth(seoYear, monthNo) {
   const arr = state.data.rangesBySeoYear.get(seoYear) || [];
   return arr.find(x => x.monthNo === monthNo) || null;
 }
 
-function canonicalSeoianDate(dateISO){
+function canonicalSeoianDate(dateISO) {
   const sy = seoianYearForGregorian(dateISO);
   const act = activeSuperMonths(dateISO);
 
-  if(act.length === 0){
+  if (act.length === 0) {
     return { label: '—', year: sy, monthNo: null, day: null, canonical: null, active: [] };
   }
 
   const canonical = act.reduce((best, cur) => (cur.start > best.start ? cur : best), act[0]);
-  const day = DateTime.fromISO(dateISO, {zone:'UTC'})
-    .diff(DateTime.fromISO(canonical.start, {zone:'UTC'}), 'days').days + 1;
+  const day = DateTime.fromISO(dateISO, { zone: 'UTC' })
+    .diff(DateTime.fromISO(canonical.start, { zone: 'UTC' }), 'days').days + 1;
   const dayInt = Math.floor(day + 1e-9);
-  const label = `${pad2(dayInt)}/${pad2(canonical.monthNo)}/${String(sy).padStart(4,'0')}`;
+  const label = `${pad2(dayInt)}/${pad2(canonical.monthNo)}/${String(sy).padStart(4, '0')}`;
 
   return { label, year: sy, monthNo: canonical.monthNo, day: dayInt, canonical, active: act };
 }
 
-function gregorianFromSeoian(dd, mm, yyyy){
+function gregorianFromSeoian(dd, mm, yyyy) {
   const arr = state.data.rangesBySeoYear.get(yyyy) || [];
   const r = arr.find(x => x.monthNo === mm);
-  if(!r) return null;
+  if (!r) return null;
 
-  const start = DateTime.fromISO(r.start, {zone:'UTC'});
-  const target = start.plus({days: dd - 1});
-  if(target.toISODate() > r.end) return null;
+  const start = DateTime.fromISO(r.start, { zone: 'UTC' });
+  const target = start.plus({ days: dd - 1 });
+  if (target.toISODate() > r.end) return null;
 
   return target.toISODate();
 }
 
 // ---------- One-Off classification ----------
-function isMultiDayOneOff(def){
-  if(def.allDay) return true;
-  if((def.durationMinutes || 0) >= 1440) return true;
+function isMultiDayOneOff(def) {
+  if (def.allDay) return true;
+  if ((def.durationMinutes || 0) >= 1440) return true;
 
-  const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
-  const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
-  const lastDay = endLocal.minus({milliseconds:1}).toISODate();
+  const startLocal = DateTime.fromMillis(def.startUtcMs, { zone: 'utc' }).setZone(state.displayTZ);
+  const endLocal = DateTime.fromMillis(def.endUtcMs, { zone: 'utc' }).setZone(state.displayTZ);
+  const lastDay = endLocal.minus({ milliseconds: 1 }).toISODate();
 
   return startLocal.toISODate() !== lastDay;
 }
 
-function oneOffSpanISO(def){
-  const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
-  const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+function oneOffSpanISO(def) {
+  const startLocal = DateTime.fromMillis(def.startUtcMs, { zone: 'utc' }).setZone(state.displayTZ);
+  const endLocal = DateTime.fromMillis(def.endUtcMs, { zone: 'utc' }).setZone(state.displayTZ);
 
   return {
     startISO: startLocal.toISODate(),
-    endISO: endLocal.minus({milliseconds:1}).toISODate()
+    endISO: endLocal.minus({ milliseconds: 1 }).toISODate()
   };
 }
 
 // ---------- Silent Sounds / Overflow ----------
-function normalizeDaySongEntry(entry, source){
+function normalizeDaySongEntry(entry, source) {
   return {
     title: String(entry?.title || '').trim() || 'Silent Sounds Track',
     artists: String(entry?.artist || '').trim(),
@@ -1009,70 +969,70 @@ function normalizeDaySongEntry(entry, source){
   };
 }
 
-function buildSetDaySongsIndex(raw){
+function buildSetDaySongsIndex(raw) {
   const exactByDate = new Map();
   const recurringByMonthDay = new Map();
 
   const exactDates = Array.isArray(raw?.exactDates) ? raw.exactDates : [];
   const gregorianRecurring = Array.isArray(raw?.gregorianRecurring) ? raw.gregorianRecurring : [];
 
-  for(const entry of exactDates){
+  for (const entry of exactDates) {
     const dateISO = String(entry?.date || entry?.exactDate || '').trim();
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) continue;
     exactByDate.set(dateISO, normalizeDaySongEntry(entry, 'exact-date'));
   }
 
-  for(const entry of gregorianRecurring){
+  for (const entry of gregorianRecurring) {
     const monthDay = String(entry?.monthDay || '').trim();
-    if(!/^\d{2}-\d{2}$/.test(monthDay)) continue;
+    if (!/^\d{2}-\d{2}$/.test(monthDay)) continue;
     recurringByMonthDay.set(monthDay, normalizeDaySongEntry(entry, 'gregorian-recurring'));
   }
 
   return { exactByDate, recurringByMonthDay };
 }
 
-function hash32_FNV1a(str){
+function hash32_FNV1a(str) {
   let h = 0x811c9dc5;
-  for(let i=0;i<str.length;i++){
+  for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
-    h = (h + ((h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24))) >>> 0;
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
   }
   return h >>> 0;
 }
 
-function silentSoundForDate(dateISO){
+function silentSoundForDate(dateISO) {
   const setDaySongs = state.data.setDaySongs;
 
-  if(setDaySongs){
+  if (setDaySongs) {
     const exactMatch = setDaySongs.exactByDate.get(dateISO);
-    if(exactMatch) return exactMatch;
+    if (exactMatch) return exactMatch;
 
-    const monthDay = dateISO.slice(5); // "MM-DD"
+    const monthDay = dateISO.slice(5);
     const recurringMatch = setDaySongs.recurringByMonthDay.get(monthDay);
-    if(recurringMatch) return recurringMatch;
+    if (recurringMatch) return recurringMatch;
   }
 
   const songs = state.data.silentSounds;
-  if(!songs || songs.length === 0) return null;
+  if (!songs || songs.length === 0) return null;
 
   const key = `SilentSounds|${dateISO}`;
   const idx = hash32_FNV1a(key) % songs.length;
   return songs[idx];
 }
 
-function activeSeoianMonthDayPairs(dateISO){
+function activeSeoianMonthDayPairs(dateISO) {
   const act = activeSuperMonths(dateISO);
-  if(!act || act.length === 0) return [];
+  if (!act || act.length === 0) return [];
 
-  const dUTC = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+  const dUTC = DateTime.fromISO(dateISO, { zone: 'UTC' }).startOf('day');
   const pairs = [];
 
-  for(const r of act){
-    const startUTC = DateTime.fromISO(r.start, {zone:'UTC'}).startOf('day');
+  for (const r of act) {
+    const startUTC = DateTime.fromISO(r.start, { zone: 'UTC' }).startOf('day');
     const day = dUTC.diff(startUTC, 'days').days + 1;
     const dayInt = Math.floor(day + 1e-9);
 
-    if(dayInt >= 1){
+    if (dayInt >= 1) {
       pairs.push({
         monthNo: r.monthNo,
         day: dayInt,
@@ -1082,18 +1042,18 @@ function activeSeoianMonthDayPairs(dateISO){
     }
   }
 
-  pairs.sort((a,b)=> a.start.localeCompare(b.start) || (a.monthNo - b.monthNo) || (a.day - b.day));
+  pairs.sort((a, b) => a.start.localeCompare(b.start) || (a.monthNo - b.monthNo) || (a.day - b.day));
   return pairs;
 }
 
-function seoianDateLabelFromPair(dateISO, pair){
+function seoianDateLabelFromPair(dateISO, pair) {
   const sy = seoianYearForGregorian(dateISO);
-  return `${pad2(pair.day)}/${pad2(pair.monthNo)}/${String(sy).padStart(4,'0')}`;
+  return `${pad2(pair.day)}/${pad2(pair.monthNo)}/${String(sy).padStart(4, '0')}`;
 }
 
-function seoianSongSlotsForDate(dateISO){
+function seoianSongSlotsForDate(dateISO) {
   const pairs = activeSeoianMonthDayPairs(dateISO);
-  if(!pairs.length){
+  if (!pairs.length) {
     return { primary: null, overlaps: [] };
   }
 
@@ -1112,30 +1072,30 @@ function seoianSongSlotsForDate(dateISO){
   };
 }
 
-function buildOverflowSlotOrder(){
+function buildOverflowSlotOrder() {
   const out = [];
   const ranges = state.data.ranges || [];
-  if(!ranges.length) return out;
+  if (!ranges.length) return out;
 
   let minStart = null;
   let maxEnd = null;
 
-  for(const r of ranges){
-    if(!minStart || r.start < minStart) minStart = r.start;
-    if(!maxEnd || r.end > maxEnd) maxEnd = r.end;
+  for (const r of ranges) {
+    if (!minStart || r.start < minStart) minStart = r.start;
+    if (!maxEnd || r.end > maxEnd) maxEnd = r.end;
   }
 
-  if(!minStart || !maxEnd) return out;
+  if (!minStart || !maxEnd) return out;
 
-  let cursor = DateTime.fromISO(minStart, {zone:'UTC'}).startOf('day');
-  const end = DateTime.fromISO(maxEnd, {zone:'UTC'}).startOf('day');
+  let cursor = DateTime.fromISO(minStart, { zone: 'UTC' }).startOf('day');
+  const end = DateTime.fromISO(maxEnd, { zone: 'UTC' }).startOf('day');
 
-  while(cursor <= end){
+  while (cursor <= end) {
     const dateISO = cursor.toISODate();
     const slots = seoianSongSlotsForDate(dateISO);
     const overlaps = slots.overlaps || [];
 
-    for(const slot of overlaps){
+    for (const slot of overlaps) {
       out.push({
         dateISO,
         seoianLabel: slot.seoianLabel,
@@ -1144,20 +1104,20 @@ function buildOverflowSlotOrder(){
       });
     }
 
-    cursor = cursor.plus({days:1});
+    cursor = cursor.plus({ days: 1 });
   }
 
   return out;
 }
 
-function overflowSongsForDate(dateISO){
+function overflowSongsForDate(dateISO) {
   const songs = state.data.overflowSounds || [];
   const slotOrder = state.data.overflowSlotOrder || [];
 
-  if(!songs.length || !slotOrder.length) return [];
+  if (!songs.length || !slotOrder.length) return [];
 
   const matches = slotOrder.filter(slot => slot.dateISO === dateISO);
-  if(!matches.length) return [];
+  if (!matches.length) return [];
 
   return matches.map((slot, idx) => {
     const absoluteIndex = slotOrder.findIndex(
@@ -1179,21 +1139,19 @@ function overflowSongsForDate(dateISO){
   });
 }
 
-// ---------- Rendering ----------
-const el = (id)=>document.getElementById(id);
-
+// ---------- Friday Flowers overlay ----------
 let fridayFlowerPreview = null;
 let fridayFlowerPreviewHideTimer = null;
 
-function clearFridayFlowerPreviewHideTimer(){
-  if(fridayFlowerPreviewHideTimer){
+function clearFridayFlowerPreviewHideTimer() {
+  if (fridayFlowerPreviewHideTimer) {
     clearTimeout(fridayFlowerPreviewHideTimer);
     fridayFlowerPreviewHideTimer = null;
   }
 }
 
-function ensureFridayFlowerPreview(){
-  if(fridayFlowerPreview) return fridayFlowerPreview;
+function ensureFridayFlowerPreview() {
+  if (fridayFlowerPreview) return fridayFlowerPreview;
 
   const overlay = document.createElement('div');
   overlay.style.position = 'fixed';
@@ -1222,22 +1180,22 @@ function ensureFridayFlowerPreview(){
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 
-  overlay.addEventListener('mouseenter', ()=>{
+  overlay.addEventListener('mouseenter', () => {
     clearFridayFlowerPreviewHideTimer();
   });
 
-  overlay.addEventListener('mouseleave', ()=>{
+  overlay.addEventListener('mouseleave', () => {
     hideFridayFlowerPreview(true);
   });
 
-  overlay.addEventListener('click', (ev)=>{
-    if(ev.target === overlay){
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) {
       hideFridayFlowerPreview(true);
     }
   });
 
-  document.addEventListener('keydown', (ev)=>{
-    if(ev.key === 'Escape'){
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') {
       hideFridayFlowerPreview(true);
     }
   });
@@ -1246,8 +1204,8 @@ function ensureFridayFlowerPreview(){
   return fridayFlowerPreview;
 }
 
-function showFridayFlowerPreview(src, alt='Friday Flowers'){
-  if(!src) return;
+function showFridayFlowerPreview(src, alt = 'Friday Flowers') {
+  if (!src) return;
 
   clearFridayFlowerPreviewHideTimer();
 
@@ -1256,63 +1214,63 @@ function showFridayFlowerPreview(src, alt='Friday Flowers'){
   img.alt = alt;
   overlay.dataset.openSrc = src;
 
-  if(overlay.style.display !== 'flex'){
+  if (overlay.style.display !== 'flex') {
     overlay.style.display = 'flex';
-    requestAnimationFrame(()=>{
+    requestAnimationFrame(() => {
       overlay.style.opacity = '1';
     });
-  }else{
+  } else {
     overlay.style.opacity = '1';
   }
 }
 
-function hideFridayFlowerPreview(immediate=false){
+function hideFridayFlowerPreview(immediate = false) {
   const ref = ensureFridayFlowerPreview();
   const { overlay } = ref;
 
   clearFridayFlowerPreviewHideTimer();
 
-  if(immediate){
+  if (immediate) {
     overlay.style.opacity = '0';
-    setTimeout(()=>{
+    setTimeout(() => {
       overlay.style.display = 'none';
       overlay.dataset.openSrc = '';
     }, 120);
     return;
   }
 
-  fridayFlowerPreviewHideTimer = setTimeout(()=>{
+  fridayFlowerPreviewHideTimer = setTimeout(() => {
     overlay.style.opacity = '0';
-    setTimeout(()=>{
+    setTimeout(() => {
       overlay.style.display = 'none';
       overlay.dataset.openSrc = '';
     }, 120);
   }, 90);
 }
 
-function attachFridayFlowerPreview(imgEl){
-  if(!imgEl) return;
+function attachFridayFlowerPreview(imgEl) {
+  if (!imgEl) return;
 
   imgEl.style.cursor = 'zoom-in';
   imgEl.tabIndex = 0;
 
-  imgEl.addEventListener('mouseenter', ()=>{
+  imgEl.addEventListener('mouseenter', () => {
     showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
   });
 
-  imgEl.addEventListener('mouseleave', ()=>{
+  imgEl.addEventListener('mouseleave', () => {
     hideFridayFlowerPreview(false);
   });
 
-  imgEl.addEventListener('focus', ()=>{
+  imgEl.addEventListener('focus', () => {
     showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
   });
 
-  imgEl.addEventListener('blur', ()=>{
+  imgEl.addEventListener('blur', () => {
     hideFridayFlowerPreview(true);
   });
 
-  imgEl.addEventListener('click', (ev)=>{
+  imgEl.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
 
@@ -1321,45 +1279,52 @@ function attachFridayFlowerPreview(imgEl){
       ref.overlay.style.display === 'flex' &&
       ref.overlay.dataset.openSrc === imgEl.src;
 
-    if(isSameImageOpen){
+    if (isSameImageOpen) {
       hideFridayFlowerPreview(true);
-    }else{
+    } else {
       showFridayFlowerPreview(imgEl.src, imgEl.alt || 'Friday Flowers');
     }
   });
 }
 
-function render(){
+// ---------- Rendering ----------
+function render() {
   closeMorePopover();
 
-  const seo = canonicalSeoianDate(state.focusDateISO);
-  if(seo.canonical){
-    el('calTitle').textContent = `${seo.canonical.monthName}, ${String(seo.year).padStart(4,'0')}`;
-  }else{
-    el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
+  if (state.view === 'year' && !isMobileAFDS()) {
+    const dt = DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ });
+    el('calTitle').textContent = dt.toFormat('yyyy');
+  } else {
+    const seo = canonicalSeoianDate(state.focusDateISO);
+    if (seo.canonical) {
+      el('calTitle').textContent = `${seo.canonical.monthName}, ${String(seo.year).padStart(4, '0')}`;
+    } else {
+      el('calTitle').textContent = monthTitle(state.focusDateISO, state.displayTZ);
+    }
   }
 
   renderInspector();
   renderCenter();
 }
 
-function renderCenter(){
+function renderCenter() {
   const surf = el('calSurface');
   surf.innerHTML = '';
 
-  if(state.view === 'month') surf.appendChild(renderMonthView());
-  if(state.view === 'week') surf.appendChild(renderWeekView());
-  if(state.view === 'day') surf.appendChild(renderDayView());
-  if(state.view === 'list') surf.appendChild(renderListView());
-  if(state.view === 'clocks') surf.appendChild(renderClocksView());
+  if (state.view === 'month') surf.appendChild(renderMonthView());
+  if (state.view === 'week') surf.appendChild(renderWeekView());
+  if (state.view === 'day') surf.appendChild(renderDayView());
+  if (state.view === 'list') surf.appendChild(renderListView());
+  if (state.view === 'clocks') surf.appendChild(renderClocksView());
+  if (state.view === 'year' && !isMobileAFDS()) surf.appendChild(renderYearView());
 }
 
-function renderDayView(){
+function renderDayView() {
   const wrap = document.createElement('div');
   wrap.className = 'single-view-card day-view';
 
   const source = el('leftPanel')?.querySelector('.panel-inner');
-  if(!source) return wrap;
+  if (!source) return wrap;
 
   const clone = source.cloneNode(true);
 
@@ -1368,79 +1333,174 @@ function renderDayView(){
   });
 
   const deadToggle = clone.querySelector('.toggle');
-  if(deadToggle) deadToggle.remove();
+  if (deadToggle) deadToggle.remove();
 
   wrap.appendChild(clone);
   return wrap;
 }
 
-function renderClocksView(){
+function renderYearView() {
   const wrap = document.createElement('div');
-  wrap.className = 'single-view-card clocks-view';
+  wrap.style.padding = '12px';
+  wrap.style.display = 'grid';
+  wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+  wrap.style.gap = '12px';
 
-  const source = el('rightPanel')?.querySelector('.panel-inner');
-  if(!source) return wrap;
+  const focus = DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ });
+  const year = focus.year;
+  const todayISO = DateTime.now().setZone(state.displayTZ).toISODate();
 
-  const clone = source.cloneNode(true);
+  for (let month = 1; month <= 12; month++) {
+    const card = document.createElement('div');
+    card.style.border = '1px solid var(--line)';
+    card.style.borderRadius = '14px';
+    card.style.background = 'rgba(255,255,255,0.08)';
+    card.style.padding = '10px';
 
-  clone.querySelectorAll('[id]').forEach(node => {
-    node.removeAttribute('id');
-  });
+    const head = document.createElement('div');
+    head.textContent = DateTime.fromObject({ year, month, day: 1 }, { zone: state.displayTZ }).toFormat('LLLL');
+    head.style.fontWeight = '700';
+    head.style.marginBottom = '8px';
+    card.appendChild(head);
 
-  wrap.appendChild(clone);
+    const dow = document.createElement('div');
+    dow.style.display = 'grid';
+    dow.style.gridTemplateColumns = 'repeat(7, 1fr)';
+    dow.style.gap = '2px';
+    dow.style.marginBottom = '4px';
+
+    for (const d of DOW) {
+      const cell = document.createElement('div');
+      cell.textContent = d[0];
+      cell.style.fontSize = '11px';
+      cell.style.color = 'var(--muted)';
+      cell.style.textAlign = 'center';
+      dow.appendChild(cell);
+    }
+    card.appendChild(dow);
+
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+    grid.style.gap = '2px';
+
+    const first = DateTime.fromObject({ year, month, day: 1 }, { zone: state.displayTZ });
+    const startOffset = first.weekday % 7;
+    const daysInMonth = first.daysInMonth;
+
+    for (let i = 0; i < startOffset; i++) {
+      const blank = document.createElement('div');
+      blank.style.minHeight = '30px';
+      grid.appendChild(blank);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dt = DateTime.fromObject({ year, month, day }, { zone: state.displayTZ });
+      const dateISO = dt.toISODate();
+
+      const hasAny =
+        activeSuperMonths(dateISO).length > 0 ||
+        recurringDayDefsForDate(dateISO, 'showOnCalendar').length > 0 ||
+        oneOffsForDate(dateISO, 'calendar').length > 0;
+
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.style.minHeight = '30px';
+      cell.style.border = '1px solid var(--line)';
+      cell.style.borderRadius = '8px';
+      cell.style.background = 'rgba(255,255,255,0.04)';
+      cell.style.color = 'var(--text)';
+      cell.style.cursor = 'pointer';
+      cell.style.position = 'relative';
+      cell.style.font = 'inherit';
+      cell.textContent = String(day);
+
+      if (dateISO === todayISO) {
+        cell.style.outline = '2px solid rgba(255,255,0,0.55)';
+      }
+
+      if (dateISO === state.focusDateISO) {
+        cell.style.background = 'rgba(0,176,240,0.18)';
+      }
+
+      if (hasAny) {
+        const dot = document.createElement('span');
+        dot.style.position = 'absolute';
+        dot.style.left = '50%';
+        dot.style.bottom = '3px';
+        dot.style.transform = 'translateX(-50%)';
+        dot.style.width = '5px';
+        dot.style.height = '5px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = '#00B0F0';
+        cell.appendChild(dot);
+      }
+
+      cell.addEventListener('click', () => activateDate(dateISO));
+      grid.appendChild(cell);
+    }
+
+    card.appendChild(grid);
+    wrap.appendChild(card);
+  }
+
   return wrap;
 }
 
-function renderMonthView(){
+function getWeekFocusStart() {
+  return startOfWeekSunday(DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ }));
+}
+
+function renderMonthView() {
   const wrap = document.createElement('div');
   wrap.className = 'month';
 
   const dow = document.createElement('div');
   dow.className = 'dow';
-  for(const d of DOW){
+  for (const d of DOW) {
     const cell = document.createElement('div');
     cell.textContent = d;
     dow.appendChild(cell);
   }
   wrap.appendChild(dow);
 
-  const dt = DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ});
+  const dt = DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ });
   const monthSeo = canonicalSeoianDate(state.focusDateISO);
 
   const rangeStartISO = monthSeo.canonical ? monthSeo.canonical.start : dt.startOf('month').toISODate();
-  const rangeEndISO   = monthSeo.canonical ? monthSeo.canonical.end   : dt.endOf('month').toISODate();
+  const rangeEndISO = monthSeo.canonical ? monthSeo.canonical.end : dt.endOf('month').toISODate();
 
-  const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}));
-  const end   = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}));
+  const start = startOfWeekSunday(DateTime.fromISO(rangeStartISO, { zone: state.displayTZ }));
+  const end = endOfWeekSaturday(DateTime.fromISO(rangeEndISO, { zone: state.displayTZ }));
 
   const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'calendar');
 
   let cursor = start;
 
-  while(cursor <= end){
+  while (cursor <= end) {
     const weekStart = cursor;
 
     const weekEl = document.createElement('div');
     weekEl.className = 'week';
 
     const weekStartISO = weekStart.setZone(state.displayTZ).toISODate();
-    const weekEndISO   = weekStart.plus({days:6}).setZone(state.displayTZ).toISODate();
+    const weekEndISO = weekStart.plus({ days: 6 }).setZone(state.displayTZ).toISODate();
 
     const allEvents = collectEventsForRange(weekStartISO, weekEndISO);
 
-    const tierSuper  = allEvents.filter(e => e.kind === 'supermonth');
+    const tierSuper = allEvents.filter(e => e.kind === 'supermonth');
     const tierOneOff = allEvents.filter(e => e.kind === 'oneoff');
-    const tierOther  = allEvents.filter(e => e.kind !== 'supermonth' && e.kind !== 'oneoff');
+    const tierOther = allEvents.filter(e => e.kind !== 'supermonth' && e.kind !== 'oneoff');
 
     const hiddenByDay = new Map();
-    const addHidden = (m)=>{
-      for(const [k,v] of m.entries()){
+    const addHidden = (m) => {
+      for (const [k, v] of m.entries()) {
         hiddenByDay.set(k, (hiddenByDay.get(k) || 0) + v);
       }
     };
 
-    function renderTier(events, maxLanes){
-      if(!events.length) return null;
+    function renderTier(events, maxLanes) {
+      if (!events.length) return null;
 
       const tier = document.createElement('div');
       tier.className = 'month-bars';
@@ -1448,17 +1508,11 @@ function renderMonthView(){
       const { placed, hiddenByDay: hid } = placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes);
       addHidden(hid);
 
-      for(const p of placed){
+      for (const p of placed) {
         const bar = document.createElement('div');
         bar.className = barClassForEvent(p);
-        /* bar.className =
-          (p.kind === 'special') ? 'bar special'
-          : (p.kind === 'standard') ? 'bar standard'
-          : (p.kind === 'oneoff') ? 'bar oneoff'
-          : ('bar' + (p.lane === 1 ? ' secondary' : '')); */
-
-        bar.style.gridColumn = `${p.colStart} / ${p.colEnd+1}`;
-        bar.style.gridRow = `${p.lane+1}`;
+        bar.style.gridColumn = `${p.colStart} / ${p.colEnd + 1}`;
+        bar.style.gridRow = `${p.lane + 1}`;
         bar.textContent = p.label;
         bar.title = p.label;
         tier.appendChild(bar);
@@ -1471,15 +1525,15 @@ function renderMonthView(){
     const t2 = renderTier(tierOneOff, 2);
     const t3 = renderTier(tierOther, 3);
 
-    if(t1) weekEl.appendChild(t1);
-    if(t2) weekEl.appendChild(t2);
-    if(t3) weekEl.appendChild(t3);
+    if (t1) weekEl.appendChild(t1);
+    if (t2) weekEl.appendChild(t2);
+    if (t3) weekEl.appendChild(t3);
 
     const daysEl = document.createElement('div');
     daysEl.className = 'week-days';
 
-    for(let i=0;i<7;i++){
-      const dayDT = weekStart.plus({days:i}).setZone(state.displayTZ);
+    for (let i = 0; i < 7; i++) {
+      const dayDT = weekStart.plus({ days: i }).setZone(state.displayTZ);
       const dateISO = dayDT.toISODate();
 
       const day = document.createElement('div');
@@ -1487,26 +1541,26 @@ function renderMonthView(){
       day.dataset.date = dateISO;
 
       const todayISO = DateTime.now().setZone(state.displayTZ).toISODate();
-      if(dateISO === todayISO) day.classList.add('today');
-      if(state.highlightDateISO && dateISO === state.highlightDateISO) day.classList.add('highlight');
+      if (dateISO === todayISO) day.classList.add('today');
+      if (state.highlightDateISO && dateISO === state.highlightDateISO) day.classList.add('highlight');
 
-      if(monthSeo.canonical){
+      if (monthSeo.canonical) {
         const inRange = (dateISO >= rangeStartISO && dateISO <= rangeEndISO);
-        if(!inRange) day.classList.add('outside');
+        if (!inRange) day.classList.add('outside');
       }
 
       const sd = document.createElement('div');
       sd.className = 'sd';
       sd.textContent = seoianLabelWithOverlaps(dateISO);
-      if(sd.textContent === '—') sd.textContent = '';
+      if (sd.textContent === '—') sd.textContent = '';
       day.appendChild(sd);
 
       const lunarEvents = lunarPhasesForDate(dateISO);
-      if(lunarEvents.length){
+      if (lunarEvents.length) {
         const lunar = document.createElement('div');
         lunar.className = 'lunar-markers';
 
-        for(const event of lunarEvents){
+        for (const event of lunarEvents) {
           const marker = document.createElement('span');
           marker.className = `lunar-marker lunar-${event.phaseKey}`;
           marker.textContent = event.marker;
@@ -1519,12 +1573,12 @@ function renderMonthView(){
       }
 
       const weather = buildWeatherMarkerEl(dateISO, { compact: true });
-      if(weather) day.appendChild(weather);
+      if (weather) day.appendChild(weather);
 
       const timed = (oneOffByDay.get(dateISO) || []).filter(ev => !isMultiDayOneOff(ev));
       const MAX_TIMED_VISIBLE = 2;
 
-      if(timed.length){
+      if (timed.length) {
         const items = document.createElement('div');
         items.className = 'day-items';
 
@@ -1551,36 +1605,35 @@ function renderMonthView(){
       const hiddenTimed = Math.max(0, timed.length - MAX_TIMED_VISIBLE);
       const hiddenCount = hiddenBars + hiddenTimed;
 
-      if(hiddenCount > 0){
+      if (hiddenCount > 0) {
         const more = document.createElement('div');
         more.className = 'more';
         more.textContent = `+${hiddenCount} more`;
-        more.addEventListener('click', (ev)=>{
+        more.addEventListener('click', (ev) => {
           ev.stopPropagation();
           openMorePopover(dateISO, more);
         });
         day.appendChild(more);
       }
 
-      day.addEventListener('click', ()=> activateDate(dateISO));
-
+      day.addEventListener('click', () => activateDate(dateISO));
       daysEl.appendChild(day);
     }
 
     weekEl.appendChild(daysEl);
     wrap.appendChild(weekEl);
 
-    cursor = cursor.plus({weeks:1});
+    cursor = cursor.plus({ weeks: 1 });
   }
 
   return wrap;
 }
 
-function renderWeekView(){
+function renderWeekView() {
   const wrap = document.createElement('div');
   wrap.className = 'week';
 
-  const dt = startOfWeekSunday(DateTime.fromISO(state.focusDateISO, {zone: state.displayTZ}));
+  const dt = getWeekFocusStart();
 
   const header = document.createElement('div');
   header.className = 'week-dow';
@@ -1589,10 +1642,10 @@ function renderWeekView(){
   spacer.className = 'week-dow-spacer';
   header.appendChild(spacer);
 
-  const showGreg = el('toggleGregorian').checked;
+  const showGreg = el('toggleGregorian')?.checked;
 
-  for(let i=0;i<7;i++){
-    const d = dt.plus({days:i});
+  for (let i = 0; i < 7; i++) {
+    const d = dt.plus({ days: i });
     const dateISO = d.toISODate();
 
     const cell = document.createElement('div');
@@ -1604,7 +1657,7 @@ function renderWeekView(){
     main.textContent = (label && label !== '—') ? `${DOW[i]} ${label}` : `${DOW[i]}`;
     cell.appendChild(main);
 
-    if(showGreg){
+    if (showGreg) {
       const sub = document.createElement('div');
       sub.className = 'week-dow-sub';
       sub.textContent = d.toFormat('d/L/yyyy');
@@ -1612,20 +1665,19 @@ function renderWeekView(){
     }
 
     const lunar = buildLunarMarkersEl(dateISO);
-    if(lunar) cell.appendChild(lunar);
+    if (lunar) cell.appendChild(lunar);
 
     const weather = buildWeatherMarkerEl(dateISO, { compact: true });
-    if(weather) cell.appendChild(weather);
+    if (weather) cell.appendChild(weather);
 
-    cell.addEventListener('click', ()=> activateDate(dateISO));
-
+    cell.addEventListener('click', () => activateDate(dateISO));
     header.appendChild(cell);
   }
 
   wrap.appendChild(header);
 
   const weekStartISO = dt.toISODate();
-  const weekEndISO = dt.plus({days:6}).toISODate();
+  const weekEndISO = dt.plus({ days: 6 }).toISODate();
 
   const barsEl = document.createElement('div');
   barsEl.className = 'week-bars';
@@ -1633,18 +1685,11 @@ function renderWeekView(){
   const events = collectEventsForRange(weekStartISO, weekEndISO);
   const { placed } = placeEventsInWeek(events, weekStartISO, weekEndISO, 5);
 
-  for(const p of placed){
+  for (const p of placed) {
     const bar = document.createElement('div');
     bar.className = barClassForEvent(p);
-    
-    /* bar.className =
-      (p.kind === 'special') ? 'bar special' :
-      (p.kind === 'standard') ? 'bar standard' :
-      (p.kind === 'oneoff') ? 'bar oneoff' :
-      ('bar' + (p.lane === 1 ? ' secondary' : '')); */
-
-    bar.style.gridColumn = `${p.colStart+1} / ${p.colEnd+2}`;
-    bar.style.gridRow = `${p.lane+1}`;
+    bar.style.gridColumn = `${p.colStart + 1} / ${p.colEnd + 2}`;
+    bar.style.gridRow = `${p.lane + 1}`;
     bar.textContent = p.label;
     barsEl.appendChild(bar);
   }
@@ -1661,29 +1706,29 @@ function renderWeekView(){
 
   const cellMap = new Map();
 
-  for(let h=0; h<24; h++){
+  for (let h = 0; h < 24; h++) {
     const lbl = document.createElement('div');
     lbl.className = 'time-label';
 
     const primary = document.createElement('span');
     primary.className = 'main';
-    primary.textContent = `${String(h).padStart(2,'0')}:00`;
+    primary.textContent = `${String(h).padStart(2, '0')}:00`;
     lbl.appendChild(primary);
 
     const ov = document.createElement('span');
     ov.className = 'ov';
-    ov.textContent = (h < extraCount) ? `${String(24+h).padStart(2,'0')}:00` : '';
+    ov.textContent = (h < extraCount) ? `${String(24 + h).padStart(2, '0')}:00` : '';
     lbl.appendChild(ov);
 
     grid.appendChild(lbl);
 
-    for(let d=0; d<7; d++){
+    for (let d = 0; d < 7; d++) {
       const cell = document.createElement('div');
       cell.className = 'week-cell';
-      const dateISO = dt.plus({days:d}).toISODate();
+      const dateISO = dt.plus({ days: d }).toISODate();
       cell.dataset.date = dateISO;
       cell.dataset.hour = String(h);
-      cellMap.set(`${dateISO}|${String(h).padStart(2,'0')}`, cell);
+      cellMap.set(`${dateISO}|${String(h).padStart(2, '0')}`, cell);
       grid.appendChild(cell);
     }
   }
@@ -1694,8 +1739,8 @@ function renderWeekView(){
   return wrap;
 }
 
-function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
-  if(!enabledForOneOff()) return;
+function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO) {
+  if (!enabledForOneOff()) return;
 
   const byDay = groupOneOffsByDay(weekStartISO, weekEndISO, 'calendar');
 
@@ -1705,25 +1750,25 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
 
   const MIN_H = 18;
 
-  for(const [dateISO, events] of byDay.entries()){
+  for (const [dateISO, events] of byDay.entries()) {
     const dayStart = DateTime.fromISO(dateISO, { zone: state.displayTZ }).startOf('day');
     const dayEndExclusive = dayStart.plus({ days: 1 });
     const seen = new Set();
 
-    for(const ev of events){
+    for (const ev of events) {
       const segStart = (ev.startLocal < dayStart) ? dayStart : ev.startLocal;
-      const segEnd   = (ev.endLocal > dayEndExclusive) ? dayEndExclusive : ev.endLocal;
+      const segEnd = (ev.endLocal > dayEndExclusive) ? dayEndExclusive : ev.endLocal;
 
-      if(segEnd <= segStart) continue;
+      if (segEnd <= segStart) continue;
 
       const durationMin = Math.max(
         1,
         Math.round(segEnd.diff(segStart, 'minutes').minutes)
       );
 
-      const hourKey = `${dateISO}|${String(segStart.hour).padStart(2,'0')}`;
+      const hourKey = `${dateISO}|${String(segStart.hour).padStart(2, '0')}`;
       const cell = cellMap.get(hourKey);
-      if(!cell) continue;
+      if (!cell) continue;
 
       const dedupeKey = [
         ev.id || '',
@@ -1733,7 +1778,7 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
         segEnd.toISO()
       ].join('|');
 
-      if(seen.has(dedupeKey)) continue;
+      if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
       const block = document.createElement('div');
@@ -1751,21 +1796,21 @@ function renderOneOffBlocksInWeek(cellMap, weekStartISO, weekEndISO){
   }
 }
 
-function renderListView(){
+function renderListView() {
   const wrap = document.createElement('div');
-  wrap.style.padding='12px';
-  wrap.style.display='flex';
-  wrap.style.flexDirection='column';
-  wrap.style.gap='10px';
+  wrap.style.padding = '12px';
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.gap = '10px';
 
-  const focus = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
-  const start = focus.startOf('day').minus({days:3});
-  const end = focus.startOf('day').plus({days:26});
+  const focus = DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ });
+  const start = focus.startOf('day').minus({ days: 3 });
+  const end = focus.startOf('day').plus({ days: 26 });
 
   const oneOffByDay = groupOneOffsByDay(start.toISODate(), end.toISODate(), 'list');
 
-  for(let i=0;i<=end.diff(start,'days').days;i++){
-    const d = start.plus({days:i});
+  for (let i = 0; i <= end.diff(start, 'days').days; i++) {
+    const d = start.plus({ days: i });
     const dateISO = d.toISODate();
     const seo = canonicalSeoianDate(dateISO);
 
@@ -1774,90 +1819,88 @@ function renderListView(){
     const oneOffs = oneOffByDay.get(dateISO) || [];
 
     const card = document.createElement('div');
-    card.style.border='1px solid var(--line)';
-    card.style.borderRadius='14px';
-    card.style.background='rgba(255,255,255,0.08)';
-    card.style.padding='10px 12px';
+    card.style.border = '1px solid var(--line)';
+    card.style.borderRadius = '14px';
+    card.style.background = 'rgba(255,255,255,0.08)';
+    card.style.padding = '10px 12px';
 
     const head = document.createElement('div');
-    head.style.display='flex';
-    head.style.justifyContent='space-between';
-    head.style.alignItems='baseline';
+    head.style.display = 'flex';
+    head.style.justifyContent = 'space-between';
+    head.style.alignItems = 'baseline';
 
     const h1 = document.createElement('div');
-    h1.style.fontFamily='var(--mono)';
-    h1.style.fontWeight='700';
+    h1.style.fontFamily = 'var(--mono)';
+    h1.style.fontWeight = '700';
     h1.textContent = seo.label;
     head.appendChild(h1);
 
     const h2 = document.createElement('div');
-    h2.style.color='var(--muted)';
-    h2.style.fontSize='12px';
+    h2.style.color = 'var(--muted)';
+    h2.style.fontSize = '12px';
     h2.textContent = fmtGreg(dateISO);
-    if(!el('toggleGregorian').checked) h2.style.display='none';
+    if (!el('toggleGregorian')?.checked) h2.style.display = 'none';
     head.appendChild(h2);
 
     card.appendChild(head);
 
     const lunar = buildLunarMarkersEl(dateISO);
-    if(lunar){
+    if (lunar) {
       lunar.style.marginTop = '6px';
       card.appendChild(lunar);
     }
 
     const weather = buildWeatherMarkerEl(dateISO, { compact: false });
-    if(weather){
+    if (weather) {
       weather.style.marginTop = '6px';
       card.appendChild(weather);
     }
 
     const items = document.createElement('div');
-    items.style.marginTop='8px';
-    items.style.display='flex';
-    items.style.flexDirection='column';
-    items.style.gap='6px';
+    items.style.marginTop = '8px';
+    items.style.display = 'flex';
+    items.style.flexDirection = 'column';
+    items.style.gap = '6px';
 
     let any = false;
 
-    for(const a of active.sort((x,y)=>x.monthNo-y.monthNo)){
+    for (const a of active.sort((x, y) => x.monthNo - y.monthNo)) {
       any = true;
       const row = document.createElement('div');
       row.textContent = a.monthName;
-      row.style.fontSize='13px';
+      row.style.fontSize = '13px';
       items.appendChild(row);
     }
 
-    for(const def of dayDefs){
+    for (const def of dayDefs) {
       any = true;
       const row = document.createElement('div');
       row.textContent = def.title;
-      row.style.fontSize='13px';
-      row.style.fontWeight='600';
+      row.style.fontSize = '13px';
+      row.style.fontWeight = '600';
       items.appendChild(row);
     }
 
-    if(state.filters.oneOff){
-      for(const ev of oneOffs){
+    if (state.filters.oneOff) {
+      for (const ev of oneOffs) {
         any = true;
         const row = document.createElement('div');
         const label = isMultiDayOneOff(ev) ? ev.title : `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`;
         row.textContent = label;
-        row.style.fontSize='13px';
+        row.style.fontSize = '13px';
         items.appendChild(row);
       }
     }
 
-    if(!any){
+    if (!any) {
       const row = document.createElement('div');
-      row.className='muted small';
-      row.textContent='(no periods)';
+      row.className = 'muted small';
+      row.textContent = '(no periods)';
       items.appendChild(row);
     }
 
     card.appendChild(items);
-
-    card.addEventListener('click', ()=> activateDate(dateISO));
-
+    card.addEventListener('click', () => activateDate(dateISO));
     wrap.appendChild(card);
   }
 
@@ -1865,41 +1908,41 @@ function renderListView(){
 }
 
 // ---------- Events for spanning bars ----------
-function enabledForCategory(cat){
+function enabledForCategory(cat) {
   const c = categoryKey(cat);
-  if(isSpecialCategory(c)) return state.filters.specialDays;
-  if(isStandardCategory(c)) return state.filters.standardDays;
+  if (isSpecialCategory(c)) return state.filters.specialDays;
+  if (isStandardCategory(c)) return state.filters.standardDays;
   return true;
 }
 
-function enabledForOneOff(){ return !!state.filters.oneOff; }
+function enabledForOneOff() { return !!state.filters.oneOff; }
 
-function syEventDefsForDate(dateISO){
-  if(!state.data.syByKey) return [];
+function syEventDefsForDate(dateISO) {
+  if (!state.data.syByKey) return [];
 
   const syYear = seoianYearForGregorian(dateISO);
   const pairs = activeSeoianMonthDayPairs(dateISO);
-  if(pairs.length === 0) return [];
+  if (pairs.length === 0) return [];
 
   const byId = new Map();
 
-  for(const p of pairs){
+  for (const p of pairs) {
     const key = `${p.monthNo}-${p.day}`;
     const arr = state.data.syByKey.get(key) || [];
 
-    for(const def of arr){
-      if(!enabledForCategory(def.category)) continue;
-      if(syYear < (def.syStartYear || 1)) continue;
+    for (const def of arr) {
+      if (!enabledForCategory(def.category)) continue;
+      if (syYear < (def.syStartYear || 1)) continue;
 
       const existing = byId.get(def.id);
-      if(!existing){
+      if (!existing) {
         byId.set(def.id, def);
-      }else{
+      } else {
         const er = existing.rank ?? 9;
         const dr = def.rank ?? 9;
         const es = existing.sequence ?? 9999;
         const ds = def.sequence ?? 9999;
-        if(dr < er || (dr === er && ds < es)){
+        if (dr < er || (dr === er && ds < es)) {
           byId.set(def.id, def);
         }
       }
@@ -1908,7 +1951,7 @@ function syEventDefsForDate(dateISO){
 
   const out = Array.from(byId.values());
 
-  out.sort((a,b)=>
+  out.sort((a, b) =>
     (a.rank ?? 9) - (b.rank ?? 9) ||
     (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
     a.title.localeCompare(b.title)
@@ -1917,15 +1960,15 @@ function syEventDefsForDate(dateISO){
   return out;
 }
 
-function weekdayToLuxon(w){
-  if(w === null || w === undefined) return null;
+function weekdayToLuxon(w) {
+  if (w === null || w === undefined) return null;
   const n = Number(w);
-  if(!Number.isFinite(n)) return null;
-  if(n === 0) return 7;
+  if (!Number.isFinite(n)) return null;
+  if (n === 0) return 7;
   return n;
 }
 
-function easterSundayMonthDay(year){
+function easterSundayMonthDay(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;
@@ -1940,59 +1983,59 @@ function easterSundayMonthDay(year){
   const m = Math.floor((a + 11 * h + 22 * l) / 451);
   const month = Math.floor((h + l - 7 * m + 114) / 31);
   const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return {month, day};
+  return { month, day };
 }
 
-function occurrenceISOForGregorianRule(def, year){
-  if(year < (def.gregStartYear || 0)) return null;
+function occurrenceISOForGregorianRule(def, year) {
+  if (year < (def.gregStartYear || 0)) return null;
 
   const zone = state.displayTZ;
   const t = def.anchorType;
 
-  if(t === 'GY_FIXED'){
-    if(!def.gyMonth || !def.gyDay) return null;
-    return DateTime.fromObject({year, month:def.gyMonth, day:def.gyDay}, {zone}).toISODate();
+  if (t === 'GY_FIXED') {
+    if (!def.gyMonth || !def.gyDay) return null;
+    return DateTime.fromObject({ year, month: def.gyMonth, day: def.gyDay }, { zone }).toISODate();
   }
 
-  if(t === 'GY_NTH_DOW'){
-    if(!def.gyMonth || !def.nth || def.weekday === null || def.weekday === undefined) return null;
+  if (t === 'GY_NTH_DOW') {
+    if (!def.gyMonth || !def.nth || def.weekday === null || def.weekday === undefined) return null;
 
     const target = weekdayToLuxon(def.weekday);
-    const first = DateTime.fromObject({year, month:def.gyMonth, day:1}, {zone});
+    const first = DateTime.fromObject({ year, month: def.gyMonth, day: 1 }, { zone });
     const firstW = first.weekday;
     const delta = (target - firstW + 7) % 7;
     const day = 1 + delta + (def.nth - 1) * 7;
 
-    const dt = DateTime.fromObject({year, month:def.gyMonth, day}, {zone});
-    if(dt.month !== def.gyMonth) return null;
+    const dt = DateTime.fromObject({ year, month: def.gyMonth, day }, { zone });
+    if (dt.month !== def.gyMonth) return null;
 
     return dt.toISODate();
   }
 
-  if(t === 'GY_LAST_DOW'){
-    if(!def.gyMonth || def.weekday === null || def.weekday === undefined) return null;
+  if (t === 'GY_LAST_DOW') {
+    if (!def.gyMonth || def.weekday === null || def.weekday === undefined) return null;
 
     const target = weekdayToLuxon(def.weekday);
-    let dt = DateTime.fromObject({year, month:def.gyMonth, day:1}, {zone}).endOf('month').startOf('day');
-    while(dt.weekday !== target) dt = dt.minus({days:1});
+    let dt = DateTime.fromObject({ year, month: def.gyMonth, day: 1 }, { zone }).endOf('month').startOf('day');
+    while (dt.weekday !== target) dt = dt.minus({ days: 1 });
     return dt.toISODate();
   }
 
-  if(t === 'GY_LAST_DOW_BEFORE_DATE'){
-    if(!def.gyMonth || !def.gyDay || def.weekday === null || def.weekday === undefined) return null;
+  if (t === 'GY_LAST_DOW_BEFORE_DATE') {
+    if (!def.gyMonth || !def.gyDay || def.weekday === null || def.weekday === undefined) return null;
 
     const target = weekdayToLuxon(def.weekday);
-    let dt = DateTime.fromObject({year, month:def.gyMonth, day:def.gyDay}, {zone}).minus({days:1}).startOf('day');
-    while(dt.weekday !== target) dt = dt.minus({days:1});
+    let dt = DateTime.fromObject({ year, month: def.gyMonth, day: def.gyDay }, { zone }).minus({ days: 1 }).startOf('day');
+    while (dt.weekday !== target) dt = dt.minus({ days: 1 });
     return dt.toISODate();
   }
 
-  if(t === 'GY_EASTER'){
-    const {month, day} = easterSundayMonthDay(year);
-    let dt = DateTime.fromObject({year, month, day}, {zone}).startOf('day');
+  if (t === 'GY_EASTER') {
+    const { month, day } = easterSundayMonthDay(year);
+    let dt = DateTime.fromObject({ year, month, day }, { zone }).startOf('day');
 
     const off = Number(def.offsetDays || 0);
-    if(Number.isFinite(off) && off !== 0) dt = dt.plus({days: off});
+    if (Number.isFinite(off) && off !== 0) dt = dt.plus({ days: off });
 
     return dt.toISODate();
   }
@@ -2000,21 +2043,21 @@ function occurrenceISOForGregorianRule(def, year){
   return null;
 }
 
-function occurrenceRangeForGregorianRule(def, year){
+function occurrenceRangeForGregorianRule(def, year) {
   const startISO = occurrenceISOForGregorianRule(def, year);
-  if(!startISO) return null;
+  if (!startISO) return null;
 
   let endISO = startISO;
 
-  if(def.endMonth && def.endDay){
-    const start = DateTime.fromISO(startISO, {zone:'UTC'}).startOf('day');
+  if (def.endMonth && def.endDay) {
+    const start = DateTime.fromISO(startISO, { zone: 'UTC' }).startOf('day');
     let end = DateTime.fromObject(
-      {year, month:def.endMonth, day:def.endDay},
-      {zone:'UTC'}
+      { year, month: def.endMonth, day: def.endDay },
+      { zone: 'UTC' }
     ).startOf('day');
 
-    if(end < start){
-      end = end.plus({years:1});
+    if (end < start) {
+      end = end.plus({ years: 1 });
     }
 
     endISO = end.toISODate();
@@ -2023,16 +2066,16 @@ function occurrenceRangeForGregorianRule(def, year){
   return { startISO, endISO };
 }
 
-function activeGregorianOccurrenceForDate(def, dateISO){
-  const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
+function activeGregorianOccurrenceForDate(def, dateISO) {
+  const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
   const year = dt.year;
 
   const yearsToCheck = (def.endMonth && def.endDay) ? [year - 1, year] : [year];
 
-  for(const y of yearsToCheck){
+  for (const y of yearsToCheck) {
     const occ = occurrenceRangeForGregorianRule(def, y);
-    if(!occ) continue;
-    if(occ.startISO <= dateISO && dateISO <= occ.endISO){
+    if (!occ) continue;
+    if (occ.startISO <= dateISO && dateISO <= occ.endISO) {
       return occ;
     }
   }
@@ -2040,23 +2083,23 @@ function activeGregorianOccurrenceForDate(def, dateISO){
   return null;
 }
 
-function gregorianDefsForDate(dateISO){
-  if(!state.data.gyDefs) return [];
+function gregorianDefsForDate(dateISO) {
+  if (!state.data.gyDefs) return [];
 
-  const dt = DateTime.fromISO(dateISO, {zone: state.displayTZ});
+  const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
   const year = dt.year;
   const out = [];
 
-  for(const def of state.data.gyDefs){
-    if(!enabledForCategory(def.category)) continue;
+  for (const def of state.data.gyDefs) {
+    if (!enabledForCategory(def.category)) continue;
 
     const yearsToCheck = (def.endMonth && def.endDay) ? [year - 1, year] : [year];
 
-    for(const y of yearsToCheck){
+    for (const y of yearsToCheck) {
       const occ = occurrenceRangeForGregorianRule(def, y);
-      if(!occ) continue;
+      if (!occ) continue;
 
-      if(occ.startISO <= dateISO && dateISO <= occ.endISO){
+      if (occ.startISO <= dateISO && dateISO <= occ.endISO) {
         out.push(def);
         break;
       }
@@ -2066,55 +2109,50 @@ function gregorianDefsForDate(dateISO){
   return out;
 }
 
-// End-exclusive day grouping.
-// Context rules:
-// - 'calendar' => SHORT one-offs only (and showOnCalendar)
-// - 'list'     => ALL one-offs (showOnCalendar)
-// - 'inspector'=> ALL one-offs (showInInspector)
-function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
+function groupOneOffsByDay(rangeStartISO, rangeEndISO, context = 'calendar') {
   const out = new Map();
-  if(!state.data.oneOffDefs || !enabledForOneOff()) return out;
+  if (!state.data.oneOffDefs || !enabledForOneOff()) return out;
 
-  const rangeStart = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
-  const rangeEndExclusive = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).plus({days:1}).startOf('day');
+  const rangeStart = DateTime.fromISO(rangeStartISO, { zone: state.displayTZ }).startOf('day');
+  const rangeEndExclusive = DateTime.fromISO(rangeEndISO, { zone: state.displayTZ }).plus({ days: 1 }).startOf('day');
 
   const rangeStartMs = rangeStart.toMillis();
   const rangeEndMsExclusive = rangeEndExclusive.toMillis();
 
-  for(const def of state.data.oneOffDefs){
+  for (const def of state.data.oneOffDefs) {
     const allow = (context === 'inspector') ? def.showInInspector : def.showOnCalendar;
-    if(!allow) continue;
+    if (!allow) continue;
 
-    if(context === 'calendar' && isMultiDayOneOff(def)) continue;
+    if (context === 'calendar' && isMultiDayOneOff(def)) continue;
 
-    const startLocal = DateTime.fromMillis(def.startUtcMs, {zone:'utc'}).setZone(state.displayTZ);
-    const endLocal = DateTime.fromMillis(def.endUtcMs, {zone:'utc'}).setZone(state.displayTZ);
+    const startLocal = DateTime.fromMillis(def.startUtcMs, { zone: 'utc' }).setZone(state.displayTZ);
+    const endLocal = DateTime.fromMillis(def.endUtcMs, { zone: 'utc' }).setZone(state.displayTZ);
 
-    if(startLocal.toMillis() >= rangeEndMsExclusive) continue;
-    if(endLocal.toMillis() <= rangeStartMs) continue;
+    if (startLocal.toMillis() >= rangeEndMsExclusive) continue;
+    if (endLocal.toMillis() <= rangeStartMs) continue;
 
     let dayCursor = startLocal.startOf('day');
-    const lastDay = endLocal.minus({milliseconds: 1}).startOf('day');
+    const lastDay = endLocal.minus({ milliseconds: 1 }).startOf('day');
 
-    while(dayCursor <= lastDay){
+    while (dayCursor <= lastDay) {
       const dayISO = dayCursor.toISODate();
 
-      if(dayISO >= rangeStartISO && dayISO <= rangeEndISO){
+      if (dayISO >= rangeStartISO && dayISO <= rangeEndISO) {
         const dayStart = dayCursor;
-        const dayEndExclusive = dayCursor.plus({days:1});
+        const dayEndExclusive = dayCursor.plus({ days: 1 });
 
-        if(startLocal < dayEndExclusive && endLocal > dayStart){
-          if(!out.has(dayISO)) out.set(dayISO, []);
+        if (startLocal < dayEndExclusive && endLocal > dayStart) {
+          if (!out.has(dayISO)) out.set(dayISO, []);
           out.get(dayISO).push({ ...def, startLocal, endLocal });
         }
       }
 
-      dayCursor = dayCursor.plus({days:1});
+      dayCursor = dayCursor.plus({ days: 1 });
     }
   }
 
-  for(const [, arr] of out.entries()){
-    arr.sort((a,b)=>
+  for (const [, arr] of out.entries()) {
+    arr.sort((a, b) =>
       a.startLocal.toMillis() - b.startLocal.toMillis() ||
       (a.rank - b.rank) ||
       (a.sequence - b.sequence) ||
@@ -2125,23 +2163,23 @@ function groupOneOffsByDay(rangeStartISO, rangeEndISO, context='calendar'){
   return out;
 }
 
-function oneOffsForDate(dateISO, context='calendar'){
+function oneOffsForDate(dateISO, context = 'calendar') {
   const m = groupOneOffsByDay(dateISO, dateISO, context);
   return m.get(dateISO) || [];
 }
 
-function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
+function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO) {
   const events = [];
 
-  if(state.filters.superMonths){
+  if (state.filters.superMonths) {
     const syStart = seoianYearForGregorian(rangeStartISO);
     const syEnd = seoianYearForGregorian(rangeEndISO);
     const years = new Set([syStart, syEnd]);
 
-    for(const y of years){
+    for (const y of years) {
       const arr = state.data.rangesBySeoYear.get(y) || [];
-      for(const r of arr){
-        if(r.end < rangeStartISO || r.start > rangeEndISO) continue;
+      for (const r of arr) {
+        if (r.end < rangeStartISO || r.start > rangeEndISO) continue;
         events.push({
           id: `${r.seoianYear}-${r.monthNo}`,
           label: r.monthName,
@@ -2156,18 +2194,18 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
     }
   }
 
-  const start = DateTime.fromISO(rangeStartISO, {zone: state.displayTZ}).startOf('day');
-  const end = DateTime.fromISO(rangeEndISO, {zone: state.displayTZ}).startOf('day');
+  const start = DateTime.fromISO(rangeStartISO, { zone: state.displayTZ }).startOf('day');
+  const end = DateTime.fromISO(rangeEndISO, { zone: state.displayTZ }).startOf('day');
   const days = Math.round(end.diff(start, 'days').days);
 
-  for(let i=0;i<=days;i++){
-    const dateISO = start.plus({days:i}).toISODate();
+  for (let i = 0; i <= days; i++) {
+    const dateISO = start.plus({ days: i }).toISODate();
     const seo = canonicalSeoianDate(dateISO);
 
-    for(const def of syEventDefsForDate(dateISO)){
-      if(!def.showOnCalendar) continue;
+    for (const def of syEventDefsForDate(dateISO)) {
+      if (!def.showOnCalendar) continue;
       events.push({
-        id: `${def.id}_${String(seo.year).padStart(4,'0')}`,
+        id: `${def.id}_${String(seo.year).padStart(4, '0')}`,
         label: def.title,
         start: dateISO,
         end: dateISO,
@@ -2181,18 +2219,18 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   const startY = start.year;
   const endY = end.year;
 
-  for(let y = startY - 1; y <= endY; y++){
-    for(const def of (state.data.gyDefs || [])){
-      if(!def.showOnCalendar) continue;
-      if(!enabledForCategory(def.category)) continue;
+  for (let y = startY - 1; y <= endY; y++) {
+    for (const def of (state.data.gyDefs || [])) {
+      if (!def.showOnCalendar) continue;
+      if (!enabledForCategory(def.category)) continue;
 
       const occ = occurrenceRangeForGregorianRule(def, y);
-      if(!occ) continue;
+      if (!occ) continue;
 
-      if(occ.endISO < rangeStartISO || occ.startISO > rangeEndISO) continue;
+      if (occ.endISO < rangeStartISO || occ.startISO > rangeEndISO) continue;
 
       events.push({
-        id: `${def.id}_${String(y).padStart(4,'0')}`,
+        id: `${def.id}_${String(y).padStart(4, '0')}`,
         label: def.title,
         start: occ.startISO,
         end: occ.endISO,
@@ -2203,13 +2241,13 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
     }
   }
 
-  if(state.filters.oneOff && state.data.oneOffDefs){
-    for(const def of state.data.oneOffDefs){
-      if(!def.showOnCalendar) continue;
-      if(!isMultiDayOneOff(def)) continue;
+  if (state.filters.oneOff && state.data.oneOffDefs) {
+    for (const def of state.data.oneOffDefs) {
+      if (!def.showOnCalendar) continue;
+      if (!isMultiDayOneOff(def)) continue;
 
       const span = oneOffSpanISO(def);
-      if(span.endISO < rangeStartISO || span.startISO > rangeEndISO) continue;
+      if (span.endISO < rangeStartISO || span.startISO > rangeEndISO) continue;
 
       events.push({
         id: `${def.id}_${span.startISO}`,
@@ -2223,7 +2261,7 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
     }
   }
 
-  events.sort((a,b)=>
+  events.sort((a, b) =>
     (a.rank ?? 9) - (b.rank ?? 9) ||
     (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
     a.start.localeCompare(b.start) ||
@@ -2233,42 +2271,42 @@ function collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO){
   return events;
 }
 
-function collectEventsForRange(rangeStartISO, rangeEndISO){
+function collectEventsForRange(rangeStartISO, rangeEndISO) {
   return collectAllDayEventOccurrencesForRange(rangeStartISO, rangeEndISO);
 }
 
-function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
+function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes) {
   const placed = [];
   const hiddenByDay = new Map();
-  const lanes = Array.from({length: maxLanes}, ()=> Array(7).fill(false));
+  const lanes = Array.from({ length: maxLanes }, () => Array(7).fill(false));
 
-  function dayIndex(dateISO){
-    const dt = DateTime.fromISO(dateISO, {zone:state.displayTZ});
-    const ws = DateTime.fromISO(weekStartISO, {zone:state.displayTZ});
+  function dayIndex(dateISO) {
+    const dt = DateTime.fromISO(dateISO, { zone: state.displayTZ });
+    const ws = DateTime.fromISO(weekStartISO, { zone: state.displayTZ });
     return Math.round(dt.diff(ws, 'days').days);
   }
 
-  for(const ev of events){
+  for (const ev of events) {
     const segStart = ev.start < weekStartISO ? weekStartISO : ev.start;
     const segEnd = ev.end > weekEndISO ? weekEndISO : ev.end;
     const cStart = clamp(dayIndex(segStart), 0, 6);
     const cEnd = clamp(dayIndex(segEnd), 0, 6);
 
     let lane = -1;
-    for(let l=0;l<maxLanes;l++){
+    for (let l = 0; l < maxLanes; l++) {
       let ok = true;
-      for(let c=cStart;c<=cEnd;c++){
-        if(lanes[l][c]) { ok = false; break; }
+      for (let c = cStart; c <= cEnd; c++) {
+        if (lanes[l][c]) { ok = false; break; }
       }
-      if(ok){ lane = l; break; }
+      if (ok) { lane = l; break; }
     }
 
-    if(lane >= 0){
-      for(let c=cStart;c<=cEnd;c++) lanes[lane][c] = true;
-      placed.push({ ...ev, lane, colStart:cStart+1, colEnd:cEnd+1 });
-    }else{
-      for(let c=cStart;c<=cEnd;c++){
-        const dISO = DateTime.fromISO(weekStartISO, {zone:state.displayTZ}).plus({days:c}).toISODate();
+    if (lane >= 0) {
+      for (let c = cStart; c <= cEnd; c++) lanes[lane][c] = true;
+      placed.push({ ...ev, lane, colStart: cStart + 1, colEnd: cEnd + 1 });
+    } else {
+      for (let c = cStart; c <= cEnd; c++) {
+        const dISO = DateTime.fromISO(weekStartISO, { zone: state.displayTZ }).plus({ days: c }).toISODate();
         hiddenByDay.set(dISO, (hiddenByDay.get(dISO) || 0) + 1);
       }
     }
@@ -2278,7 +2316,7 @@ function placeEventsInWeek(events, weekStartISO, weekEndISO, maxLanes){
 }
 
 // ---------- Snapshot: Day Inspector ----------
-function snapshotDay(dateISO){
+function snapshotDay(dateISO) {
   const seo = canonicalSeoianDate(dateISO);
   const songSlots = seoianSongSlotsForDate(dateISO);
   const fridayFlower = fridayFlowerForDate(dateISO);
@@ -2286,7 +2324,7 @@ function snapshotDay(dateISO){
   const weather = weatherForDate(dateISO);
 
   const periods = state.filters.superMonths
-    ? activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo).map(p=>p.monthName)
+    ? activeSuperMonths(dateISO).sort((a, b) => a.monthNo - b.monthNo).map(p => p.monthName)
     : [];
 
   const dayDefs = recurringDayDefsForDate(dateISO, 'showInInspector');
@@ -2319,24 +2357,27 @@ function snapshotDay(dateISO){
   render();
 }
 
-function renderInspector(){
+function renderInspector() {
   const snap = state.snapshot;
-  const showG = el('toggleGregorian').checked;
+  const showG = el('toggleGregorian')?.checked;
 
-  el('inspectorGregorian').hidden = !showG;
+  if (el('inspectorGregorian')) {
+    el('inspectorGregorian').hidden = !showG;
+  }
 
-  if(!snap){
-    el('inspectorSeoian').textContent = '—';
-    el('inspectorGregorian').textContent = '—';
-    el('inspectorPeriods').innerHTML = '<div class="muted">Hover/tap a day.</div>';
-    el('inspectorFacts').innerHTML = '<div class="muted">Hover/tap a day.</div>';
+  if (!snap) {
+    if (el('inspectorSeoian')) el('inspectorSeoian').textContent = '—';
+    if (el('inspectorGregorian')) el('inspectorGregorian').textContent = '—';
+    if (el('inspectorPeriods')) el('inspectorPeriods').innerHTML = '<div class="muted">Click/tap a day.</div>';
+    if (el('inspectorFacts')) el('inspectorFacts').innerHTML = '<div class="muted">Click/tap a day.</div>';
     return;
   }
 
-  el('inspectorSeoian').textContent = seoianLabelWithOverlaps(snap.dateISO);
-  el('inspectorGregorian').textContent = snap.gregorianLabel;
+  if (el('inspectorSeoian')) el('inspectorSeoian').textContent = seoianLabelWithOverlaps(snap.dateISO);
+  if (el('inspectorGregorian')) el('inspectorGregorian').textContent = snap.gregorianLabel;
 
   const p = el('inspectorPeriods');
+  if (!p) return;
   p.innerHTML = '';
 
   const dayDefs = snap.dayDefs || [];
@@ -2344,9 +2385,9 @@ function renderInspector(){
 
   let any = false;
 
-  if(snap.periods && snap.periods.length){
+  if (snap.periods && snap.periods.length) {
     any = true;
-    for(const item of snap.periods){
+    for (const item of snap.periods) {
       const div = document.createElement('div');
       div.className = 'pill';
       div.textContent = item;
@@ -2354,9 +2395,9 @@ function renderInspector(){
     }
   }
 
-  if(dayDefs.length){
+  if (dayDefs.length) {
     any = true;
-    for(const d of dayDefs){
+    for (const d of dayDefs) {
       const div = document.createElement('div');
       div.className = 'eventitem';
 
@@ -2366,7 +2407,7 @@ function renderInspector(){
       div.appendChild(t);
 
       const inspectorNote = inspectorNoteForDayDef(d, snap.dateISO);
-      if(inspectorNote){
+      if (inspectorNote) {
         const n = document.createElement('div');
         n.className = 'note';
         n.textContent = inspectorNote;
@@ -2377,9 +2418,9 @@ function renderInspector(){
     }
   }
 
-  if(oneOffs.length){
+  if (oneOffs.length) {
     any = true;
-    for(const ev of oneOffs){
+    for (const ev of oneOffs) {
       const div = document.createElement('div');
       div.className = 'eventitem';
 
@@ -2389,13 +2430,13 @@ function renderInspector(){
       div.appendChild(t);
 
       const originTZ = ev.originTZ || 'UTC';
-      const originDT = DateTime.fromMillis(ev.startUtcMs, {zone:'utc'}).setZone(originTZ);
+      const originDT = DateTime.fromMillis(ev.startUtcMs, { zone: 'utc' }).setZone(originTZ);
       const o = document.createElement('div');
       o.className = 'note';
       o.textContent = `Origin: ${originDT.toFormat('dd/LL/yyyy HH:mm')} ${originTZ}`;
       div.appendChild(o);
 
-      if(ev.notes){
+      if (ev.notes) {
         const n = document.createElement('div');
         n.className = 'note';
         n.textContent = ev.notes;
@@ -2406,10 +2447,10 @@ function renderInspector(){
     }
   }
 
-  if(snap.lunarPhases && snap.lunarPhases.length){
+  if (snap.lunarPhases && snap.lunarPhases.length) {
     any = true;
 
-    for(const phase of snap.lunarPhases){
+    for (const phase of snap.lunarPhases) {
       const div = document.createElement('div');
       div.className = 'eventitem lunarphase';
 
@@ -2426,8 +2467,8 @@ function renderInspector(){
       p.appendChild(div);
     }
   }
-  
-  if(snap.weather){
+
+  if (snap.weather) {
     any = true;
 
     const div = document.createElement('div');
@@ -2435,17 +2476,17 @@ function renderInspector(){
 
     const weatherUrl = weatherSourceUrlForDisplayTZ();
 
-    if(weatherUrl){
+    if (weatherUrl) {
       div.style.cursor = 'pointer';
       div.style.userSelect = 'none';
       div.title = 'Open weather source in a new tab';
 
-      div.addEventListener('click', ()=>{
+      div.addEventListener('click', () => {
         window.open(weatherUrl, '_blank', 'noopener,noreferrer');
       });
 
-      div.addEventListener('keydown', (ev)=>{
-        if(ev.key === 'Enter' || ev.key === ' '){
+      div.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
           ev.preventDefault();
           window.open(weatherUrl, '_blank', 'noopener,noreferrer');
         }
@@ -2464,9 +2505,9 @@ function renderInspector(){
     n.className = 'note';
 
     const bits = [snap.weather.summary];
-    if(Number.isFinite(snap.weather.tempMax)) bits.push(`Max ${Math.round(snap.weather.tempMax)}°`);
-    if(Number.isFinite(snap.weather.tempMin)) bits.push(`Min ${Math.round(snap.weather.tempMin)}°`);
-    if(Number.isFinite(snap.weather.precipitationSum)) bits.push(`Rain ${snap.weather.precipitationSum} mm`);
+    if (Number.isFinite(snap.weather.tempMax)) bits.push(`Max ${Math.round(snap.weather.tempMax)}°`);
+    if (Number.isFinite(snap.weather.tempMin)) bits.push(`Min ${Math.round(snap.weather.tempMin)}°`);
+    if (Number.isFinite(snap.weather.precipitationSum)) bits.push(`Rain ${snap.weather.precipitationSum} mm`);
 
     n.textContent = bits.join(' • ');
     div.appendChild(n);
@@ -2478,7 +2519,8 @@ function renderInspector(){
 
     p.appendChild(div);
   }
-  if(snap.silentSong){
+
+  if (snap.silentSong) {
     any = true;
 
     const div = document.createElement('div');
@@ -2495,7 +2537,7 @@ function renderInspector(){
       ? `${snap.silentSong.title} — ${snap.silentSong.artists}`
       : snap.silentSong.title;
 
-    if(snap.silentSong.url){
+    if (snap.silentSong.url) {
       const a = document.createElement('a');
       a.href = snap.silentSong.url;
       a.target = '_blank';
@@ -2503,14 +2545,14 @@ function renderInspector(){
       a.className = 'songlink';
       a.textContent = label;
       div.appendChild(a);
-    }else{
+    } else {
       const s = document.createElement('div');
       s.className = 'songlink';
       s.textContent = label;
       div.appendChild(s);
     }
 
-    if(snap.silentSong.note){
+    if (snap.silentSong.note) {
       const n = document.createElement('div');
       n.className = 'note';
       n.textContent = snap.silentSong.note;
@@ -2520,10 +2562,10 @@ function renderInspector(){
     p.appendChild(div);
   }
 
-  if(snap.overflowSongs && snap.overflowSongs.length){
+  if (snap.overflowSongs && snap.overflowSongs.length) {
     any = true;
 
-    for(const song of snap.overflowSongs){
+    for (const song of snap.overflowSongs) {
       const div = document.createElement('div');
       div.className = 'eventitem songofday';
 
@@ -2538,7 +2580,7 @@ function renderInspector(){
         ? `${song.title} — ${song.artists}`
         : song.title;
 
-      if(song.url){
+      if (song.url) {
         const a = document.createElement('a');
         a.href = song.url;
         a.target = '_blank';
@@ -2546,14 +2588,14 @@ function renderInspector(){
         a.className = 'songlink';
         a.textContent = label;
         div.appendChild(a);
-      }else{
+      } else {
         const s = document.createElement('div');
         s.className = 'songlink';
         s.textContent = label;
         div.appendChild(s);
       }
 
-      if(song.note){
+      if (song.note) {
         const n = document.createElement('div');
         n.className = 'note';
         n.textContent = song.note;
@@ -2564,7 +2606,7 @@ function renderInspector(){
     }
   }
 
-  if((snap.songSlots?.overlaps?.length || 0) > 0 && (!snap.overflowSongs || !snap.overflowSongs.length)){
+  if ((snap.songSlots?.overlaps?.length || 0) > 0 && (!snap.overflowSongs || !snap.overflowSongs.length)) {
     any = true;
 
     const div = document.createElement('div');
@@ -2583,7 +2625,7 @@ function renderInspector(){
     p.appendChild(div);
   }
 
-    if(snap.fridayFlower){
+  if (snap.fridayFlower) {
     any = true;
 
     const div = document.createElement('div');
@@ -2610,7 +2652,7 @@ function renderInspector(){
     img.style.background = 'rgba(255,255,255,0.08)';
 
     attachFridayFlowerPreview(img);
-      
+
     img.addEventListener('error', () => {
       img.remove();
       const n = document.createElement('div');
@@ -2623,9 +2665,10 @@ function renderInspector(){
     p.appendChild(div);
   }
 
-  if(!any) p.innerHTML = '<div class="muted">(no periods)</div>';
+  if (!any) p.innerHTML = '<div class="muted">(no periods)</div>';
 
   const f = el('inspectorFacts');
+  if (!f) return;
   f.innerHTML = '';
 
   const rows = [
@@ -2637,7 +2680,7 @@ function renderInspector(){
     ['Snapshot TZs', `${snap.tzAtSnapshot.tamaraTZ} / ${snap.tzAtSnapshot.martinTZ}`]
   ];
 
-  for(const [k,v] of rows){
+  for (const [k, v] of rows) {
     const r = document.createElement('div');
     r.className = 'factrow';
 
@@ -2653,39 +2696,20 @@ function renderInspector(){
   }
 }
 
-function renderMobileSheetMirrors(){
-  const ins = el('sheetInspector');
-  const clk = el('sheetClocks');
-  if(!ins || !clk) return;
-
-  ins.innerHTML = '';
-  clk.innerHTML = '';
-
-  const left = el('leftPanel');
-  const right = el('rightPanel');
-  if(!left || !right) return;
-
-  const cloneInspector = left.querySelector('.panel-inner').cloneNode(true);
-  ins.appendChild(cloneInspector);
-
-  const cloneClocks = right.querySelector('.panel-inner').cloneNode(true);
-  clk.appendChild(cloneClocks);
-}
-
-// Helpers for +more
-function activePeriodsForISO(dateISO){
+// ---------- +more / helpers ----------
+function activePeriodsForISO(dateISO) {
   const out = [];
-  if(state.filters.superMonths){
-    const active = activeSuperMonths(dateISO).sort((a,b)=>a.monthNo-b.monthNo);
-    for(const a of active){
+  if (state.filters.superMonths) {
+    const active = activeSuperMonths(dateISO).sort((a, b) => a.monthNo - b.monthNo);
+    for (const a of active) {
       out.push({ name: a.monthName, kind: 'supermonth' });
     }
   }
   return out;
 }
 
-function barClassForEvent(p){
-  if(p.kind === 'supermonth'){
+function barClassForEvent(p) {
+  if (p.kind === 'supermonth') {
     return (Number(p.monthNo || 0) % 2 === 0)
       ? 'bar supermonth-purple'
       : 'bar supermonth-blue';
@@ -2698,19 +2722,18 @@ function barClassForEvent(p){
     case 4: return 'bar green';
     case 5: return 'bar blue';
     case 6: return 'bar purple';
-    default:
-      return 'bar';
+    default: return 'bar';
   }
 }
 
-function buildLunarMarkersEl(dateISO, extraClass=''){
+function buildLunarMarkersEl(dateISO, extraClass = '') {
   const lunarEvents = lunarPhasesForDate(dateISO);
-  if(!lunarEvents.length) return null;
+  if (!lunarEvents.length) return null;
 
   const lunar = document.createElement('div');
   lunar.className = extraClass ? `lunar-markers ${extraClass}` : 'lunar-markers';
 
-  for(const event of lunarEvents){
+  for (const event of lunarEvents) {
     const marker = document.createElement('span');
     marker.className = `lunar-marker lunar-${event.phaseKey}`;
     marker.textContent = event.marker;
@@ -2722,27 +2745,27 @@ function buildLunarMarkersEl(dateISO, extraClass=''){
   return lunar;
 }
 
-function recurringDayDefsForDate(dateISO, visibilityField='showOnCalendar'){
+function recurringDayDefsForDate(dateISO, visibilityField = 'showOnCalendar') {
   const defs = [
     ...syEventDefsForDate(dateISO),
     ...gregorianDefsForDate(dateISO),
   ].filter(d => {
-    if(!d) return false;
-    if(visibilityField === 'showInInspector') return !!d.showInInspector;
+    if (!d) return false;
+    if (visibilityField === 'showInInspector') return !!d.showInInspector;
     return !!d.showOnCalendar;
   });
 
   const seen = new Set();
   const out = [];
 
-  for(const d of defs){
+  for (const d of defs) {
     const key = d.id || `${d.anchorType}|${d.title}`;
-    if(seen.has(key)) continue;
+    if (seen.has(key)) continue;
     seen.add(key);
     out.push(d);
   }
 
-  out.sort((a,b)=>
+  out.sort((a, b) =>
     (a.rank ?? 9) - (b.rank ?? 9) ||
     (a.sequence ?? 9999) - (b.sequence ?? 9999) ||
     a.title.localeCompare(b.title)
@@ -2751,24 +2774,24 @@ function recurringDayDefsForDate(dateISO, visibilityField='showOnCalendar'){
   return out;
 }
 
-function allDayDefsForDate(dateISO){
+function allDayDefsForDate(dateISO) {
   return recurringDayDefsForDate(dateISO, 'showOnCalendar');
 }
 
-function daysInclusive(startISO, endISO){
-  const start = DateTime.fromISO(startISO, {zone:'UTC'}).startOf('day');
-  const end = DateTime.fromISO(endISO, {zone:'UTC'}).startOf('day');
+function daysInclusive(startISO, endISO) {
+  const start = DateTime.fromISO(startISO, { zone: 'UTC' }).startOf('day');
+  const end = DateTime.fromISO(endISO, { zone: 'UTC' }).startOf('day');
   return Math.floor(end.diff(start, 'days').days) + 1;
 }
 
-function normalizeKey(s){
+function normalizeKey(s) {
   return String(s || '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '');
 }
 
-function isTMTime(def){
+function isTMTime(def) {
   const idKey = normalizeKey(def.id);
   const titleKey = normalizeKey(def.title);
 
@@ -2778,14 +2801,14 @@ function isTMTime(def){
   );
 }
 
-function inspectorNoteForDayDef(def, dateISO){
-  if(!isTMTime(def)) return def.notes || '';
+function inspectorNoteForDayDef(def, dateISO) {
+  if (!isTMTime(def)) return def.notes || '';
 
   const occ = activeGregorianOccurrenceForDate(def, dateISO);
-  if(!occ) return def.notes || '';
+  if (!occ) return def.notes || '';
 
-  const start = DateTime.fromISO(occ.startISO, {zone:'UTC'}).startOf('day');
-  const current = DateTime.fromISO(dateISO, {zone:'UTC'}).startOf('day');
+  const start = DateTime.fromISO(occ.startISO, { zone: 'UTC' }).startOf('day');
+  const current = DateTime.fromISO(dateISO, { zone: 'UTC' }).startOf('day');
   const dayNo = Math.floor(current.diff(start, 'days').days) + 1;
   const totalDays = daysInclusive(occ.startISO, occ.endISO);
 
@@ -2793,19 +2816,19 @@ function inspectorNoteForDayDef(def, dateISO){
 }
 
 // ---------- +more popover ----------
-function closeMorePopover(){
+function closeMorePopover() {
   const pop = el('morePopover');
-  if(!pop) return;
+  if (!pop) return;
   pop.hidden = true;
 
   const body = el('morePopoverBody');
-  if(body) body.innerHTML = '';
+  if (body) body.innerHTML = '';
 }
 
-function openMorePopover(dateISO, anchorEl){
+function openMorePopover(dateISO, anchorEl) {
   const pop = el('morePopover');
   const body = el('morePopoverBody');
-  if(!pop || !body) return;
+  if (!pop || !body) return;
 
   body.innerHTML = '';
 
@@ -2828,13 +2851,13 @@ function openMorePopover(dateISO, anchorEl){
     items.push({ label: `${fmtTimeHHMM(ev.startLocal)} ${ev.title}`, kind: 'oneoff' });
   });
 
-  if(!items.length){
+  if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'muted';
     empty.style.fontSize = '12px';
     empty.textContent = 'No additional items.';
     body.appendChild(empty);
-  }else{
+  } else {
     items.forEach(it => {
       const div = document.createElement('div');
       div.className = 'pop-item';
@@ -2851,7 +2874,7 @@ function openMorePopover(dateISO, anchorEl){
   let left = margin;
   let top = margin;
 
-  if(r){
+  if (r) {
     left = Math.min(window.innerWidth - width - margin, Math.max(margin, r.left));
     top = Math.min(window.innerHeight - height - margin, Math.max(margin, r.bottom + 6));
   }
@@ -2861,14 +2884,14 @@ function openMorePopover(dateISO, anchorEl){
   pop.hidden = false;
 
   const closeBtn = el('moreClose');
-  if(closeBtn){
+  if (closeBtn) {
     closeBtn.onclick = () => closeMorePopover();
   }
 
   setTimeout(() => {
     const onDoc = (ev) => {
-      if(pop.hidden) return;
-      if(pop.contains(ev.target)) return;
+      if (pop.hidden) return;
+      if (pop.contains(ev.target)) return;
       closeMorePopover();
       document.removeEventListener('click', onDoc, true);
     };
@@ -2876,33 +2899,33 @@ function openMorePopover(dateISO, anchorEl){
   }, 0);
 }
 
-window.addEventListener('click', (e)=>{
+window.addEventListener('click', (e) => {
   const pop = el('morePopover');
-  if(!pop || pop.hidden) return;
-  if(!pop.contains(e.target) && !(e.target.classList && e.target.classList.contains('more'))){
+  if (!pop || pop.hidden) return;
+  if (!pop.contains(e.target) && !(e.target.classList && e.target.classList.contains('more'))) {
     pop.hidden = true;
   }
 });
 
 // ---------- Clocks ----------
-function makeClockSVG(kind='normal'){
+function makeClockSVG(kind = 'normal') {
   const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns,'svg');
-  svg.setAttribute('viewBox','0 0 200 200');
-  svg.setAttribute('width','92%');
-  svg.setAttribute('height','92%');
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 200');
+  svg.setAttribute('width', '92%');
+  svg.setAttribute('height', '92%');
 
-  const face = document.createElementNS(ns,'circle');
-  face.setAttribute('cx','100');
-  face.setAttribute('cy','100');
-  face.setAttribute('r','92');
-  face.setAttribute('fill','#fff');
-  face.setAttribute('stroke','#e6e7ea');
-  face.setAttribute('stroke-width','2');
+  const face = document.createElementNS(ns, 'circle');
+  face.setAttribute('cx', '100');
+  face.setAttribute('cy', '100');
+  face.setAttribute('r', '92');
+  face.setAttribute('fill', '#fff');
+  face.setAttribute('stroke', '#e6e7ea');
+  face.setAttribute('stroke-width', '2');
   svg.appendChild(face);
 
-  for(let i=0;i<60;i++){
-    const tick = document.createElementNS(ns,'line');
+  for (let i = 0; i < 60; i++) {
+    const tick = document.createElementNS(ns, 'line');
     const a = (Math.PI * 2 * i) / 60;
     const r1 = (i % 5 === 0) ? 78 : 84;
     const r2 = 90;
@@ -2919,157 +2942,82 @@ function makeClockSVG(kind='normal'){
     svg.appendChild(tick);
   }
 
-  function addText(id, txt, x, y){
-    const t = document.createElementNS(ns,'text');
+  function addText(id, txt, x, y) {
+    const t = document.createElementNS(ns, 'text');
     t.setAttribute('x', x);
     t.setAttribute('y', y);
-    t.setAttribute('text-anchor','middle');
-    t.setAttribute('dominant-baseline','middle');
-    t.setAttribute('font-family','ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace');
-    t.setAttribute('font-size','14');
-    t.setAttribute('fill','#5c6470');
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('dominant-baseline', 'middle');
+    t.setAttribute('font-family', 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace');
+    t.setAttribute('font-size', '14');
+    t.setAttribute('fill', '#5c6470');
     t.id = id;
     t.textContent = txt;
     svg.appendChild(t);
   }
 
-  if(kind === 'normal'){
-    addText('n12','12',100,34);
-    addText('n3','3',166,102);
-    addText('n6','6',100,170);
-    addText('n9','9',34,102);
-  }else if(kind === 'superday'){
-    addText('n12','0',100,34);
-    addText('n3','',166,102);
-    addText('n6','',100,170);
-    addText('n9','',34,102);
+  if (kind === 'normal') {
+    addText('n12', '12', 100, 34);
+    addText('n3', '3', 166, 102);
+    addText('n6', '6', 100, 170);
+    addText('n9', '9', 34, 102);
+  } else if (kind === 'superday') {
+    addText('n12', '0', 100, 34);
+    addText('n3', '', 166, 102);
+    addText('n6', '', 100, 170);
+    addText('n9', '', 34, 102);
   }
 
-  const hour = document.createElementNS(ns,'line');
-  hour.setAttribute('x1','100');
-  hour.setAttribute('y1','100');
-  hour.setAttribute('x2','100');
-  hour.setAttribute('y2','54');
-  hour.setAttribute('stroke','#111318');
-  hour.setAttribute('stroke-width','5');
-  hour.setAttribute('stroke-linecap','round');
+  const hour = document.createElementNS(ns, 'line');
+  hour.setAttribute('x1', '100');
+  hour.setAttribute('y1', '100');
+  hour.setAttribute('x2', '100');
+  hour.setAttribute('y2', '54');
+  hour.setAttribute('stroke', '#111318');
+  hour.setAttribute('stroke-width', '5');
+  hour.setAttribute('stroke-linecap', 'round');
   hour.id = 'h';
   svg.appendChild(hour);
 
-  const minute = document.createElementNS(ns,'line');
-  minute.setAttribute('x1','100');
-  minute.setAttribute('y1','100');
-  minute.setAttribute('x2','100');
-  minute.setAttribute('y2','34');
-  minute.setAttribute('stroke','#111318');
-  minute.setAttribute('stroke-width','3');
-  minute.setAttribute('stroke-linecap','round');
+  const minute = document.createElementNS(ns, 'line');
+  minute.setAttribute('x1', '100');
+  minute.setAttribute('y1', '100');
+  minute.setAttribute('x2', '100');
+  minute.setAttribute('y2', '34');
+  minute.setAttribute('stroke', '#111318');
+  minute.setAttribute('stroke-width', '3');
+  minute.setAttribute('stroke-linecap', 'round');
   minute.id = 'm';
   svg.appendChild(minute);
 
-  const second = document.createElementNS(ns,'line');
-  second.setAttribute('x1','100');
-  second.setAttribute('y1','108');
-  second.setAttribute('x2','100');
-  second.setAttribute('y2','24');
-  second.setAttribute('stroke','#1b6b6f');
-  second.setAttribute('stroke-width','2');
-  second.setAttribute('stroke-linecap','round');
+  const second = document.createElementNS(ns, 'line');
+  second.setAttribute('x1', '100');
+  second.setAttribute('y1', '108');
+  second.setAttribute('x2', '100');
+  second.setAttribute('y2', '24');
+  second.setAttribute('stroke', '#1b6b6f');
+  second.setAttribute('stroke-width', '2');
+  second.setAttribute('stroke-linecap', 'round');
   second.id = 's';
   svg.appendChild(second);
 
-  const dot = document.createElementNS(ns,'circle');
-  dot.setAttribute('cx','100');
-  dot.setAttribute('cy','100');
-  dot.setAttribute('r','5');
-  dot.setAttribute('fill','#1b6b6f');
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('cx', '100');
+  dot.setAttribute('cy', '100');
+  dot.setAttribute('r', '5');
+  dot.setAttribute('fill', '#1b6b6f');
   svg.appendChild(dot);
 
   return svg;
 }
 
-function rotate(elm, deg){
+function rotate(elm, deg) {
+  if (!elm) return;
   elm.setAttribute('transform', `rotate(${deg} 100 100)`);
 }
 
-function mountClocks(){
-  const hostT = el('clockTamara');
-  hostT.innerHTML = '';
-  hostT.appendChild(makeClockSVG('normal'));
-
-  const hostM = el('clockMartin');
-  hostM.innerHTML = '';
-  hostM.appendChild(makeClockSVG('normal'));
-
-  const hostS = el('clockSuperday');
-  hostS.innerHTML = '';
-  hostS.appendChild(makeClockSVG('superday'));
-}
-
-function tickClocks(){
-  ensureEastWestOrder();
-  const now = DateTime.now();
-
-  const tNow = now.setZone(state.tamaraTZ);
-  const mNow = now.setZone(state.martinTZ);
-
-  updateAnalog('clockTamara', tNow);
-  updateAnalog('clockMartin', mNow);
-
-  const ae = el('ampmEast');
-  const aw = el('ampmWest');
-  if(ae) ae.textContent = tNow.toFormat('a');
-  if(aw) aw.textContent = mNow.toFormat('a');
-
-  const todayISO = now.setZone(state.displayTZ).toISODate();
-  const bounds = superDayBounds(todayISO, state.tamaraTZ, state.martinTZ);
-  const startUTC = bounds.start.toUTC();
-  const endUTC = bounds.end.toUTC();
-  const durMs = endUTC.toMillis() - startUTC.toMillis();
-  const elapsedMs = clamp(now.toUTC().toMillis() - startUTC.toMillis(), 0, durMs);
-
-  el('sdTotal').textContent = durationToHHMMCeilHalfHour(durMs);
-  el('sdElapsed').textContent = durationToHHMM(elapsedMs);
-
-  const nHours = Math.max(0.5, ceilToHalfHourHours(durMs / 3600000));
-  const q1 = roundHalfUp(nHours / 4);
-  const q2 = roundHalfUp(nHours / 2);
-  const q3 = roundHalfUp(3 * nHours / 4);
-
-  const svgS = el('clockSuperday').querySelector('svg');
-  if(svgS){
-    const t12 = svgS.querySelector('#n12');
-    const t3 = svgS.querySelector('#n3');
-    const t6 = svgS.querySelector('#n6');
-    const t9 = svgS.querySelector('#n9');
-    if(t12) t12.textContent = '0';
-    if(t3) t3.textContent = String(q1);
-    if(t6) t6.textContent = String(q2);
-    if(t9) t9.textContent = String(q3);
-  }
-
-  const frac = (durMs === 0) ? 0 : (elapsedMs / durMs);
-  const hourAngle = frac * 360;
-
-  const totalSec = Math.floor(elapsedMs / 1000);
-  const sec = totalSec % 60;
-  const totalMin = Math.floor(totalSec / 60);
-  const min = totalMin % 60;
-
-  const minAngle = (min + sec / 60) * 6;
-  const secAngle = sec * 6;
-
-  const svg = el('clockSuperday').querySelector('svg');
-  if(svg){
-    rotate(svg.querySelector('#h'), hourAngle);
-    rotate(svg.querySelector('#m'), minAngle);
-    rotate(svg.querySelector('#s'), secAngle);
-  }
-}
-
-function updateAnalog(hostId, dt){
-  const svg = el(hostId).querySelector('svg');
-  if(!svg) return;
+function applyAnalogToSVG(svg, dt) {
+  if (!svg) return;
 
   const h = svg.querySelector('#h');
   const m = svg.querySelector('#m');
@@ -3084,16 +3032,259 @@ function updateAnalog(hostId, dt){
   rotate(s, second * 6);
 }
 
+function mountClocks() {
+  const hostT = el('clockTamara');
+  if (hostT) {
+    hostT.innerHTML = '';
+    hostT.appendChild(makeClockSVG('normal'));
+  }
+
+  const hostM = el('clockMartin');
+  if (hostM) {
+    hostM.innerHTML = '';
+    hostM.appendChild(makeClockSVG('normal'));
+  }
+
+  const hostS = el('clockSuperday');
+  if (hostS) {
+    hostS.innerHTML = '';
+    hostS.appendChild(makeClockSVG('superday'));
+  }
+}
+
+function getSuperdayClockState() {
+  const now = DateTime.now();
+  const todayISO = now.setZone(state.displayTZ).toISODate();
+  const bounds = superDayBounds(todayISO, state.tamaraTZ, state.martinTZ);
+
+  const startUTC = bounds.start.toUTC();
+  const endUTC = bounds.end.toUTC();
+  const durMs = endUTC.toMillis() - startUTC.toMillis();
+  const elapsedMs = clamp(now.toUTC().toMillis() - startUTC.toMillis(), 0, durMs);
+
+  const nHours = Math.max(0.5, ceilToHalfHourHours(durMs / 3600000));
+  const q1 = roundHalfUp(nHours / 4);
+  const q2 = roundHalfUp(nHours / 2);
+  const q3 = roundHalfUp(3 * nHours / 4);
+
+  const frac = (durMs === 0) ? 0 : (elapsedMs / durMs);
+  const totalSec = Math.floor(elapsedMs / 1000);
+  const sec = totalSec % 60;
+  const totalMin = Math.floor(totalSec / 60);
+  const min = totalMin % 60;
+
+  return {
+    q1,
+    q2,
+    q3,
+    totalLabel: durationToHHMMCeilHalfHour(durMs),
+    elapsedLabel: durationToHHMM(elapsedMs),
+    hourAngle: frac * 360,
+    minAngle: (min + sec / 60) * 6,
+    secAngle: sec * 6
+  };
+}
+
+function applySuperdayToSVG(svg, data) {
+  if (!svg || !data) return;
+
+  const t12 = svg.querySelector('#n12');
+  const t3 = svg.querySelector('#n3');
+  const t6 = svg.querySelector('#n6');
+  const t9 = svg.querySelector('#n9');
+
+  if (t12) t12.textContent = '0';
+  if (t3) t3.textContent = String(data.q1);
+  if (t6) t6.textContent = String(data.q2);
+  if (t9) t9.textContent = String(data.q3);
+
+  rotate(svg.querySelector('#h'), data.hourAngle);
+  rotate(svg.querySelector('#m'), data.minAngle);
+  rotate(svg.querySelector('#s'), data.secAngle);
+}
+
+function buildTZClone(sourceId) {
+  const source = el(sourceId);
+  if (!source) return null;
+
+  const clone = source.cloneNode(true);
+  clone.id = '';
+
+  if (sourceId === 'tzTamara') clone.value = state.tamaraChoice;
+  if (sourceId === 'tzMartin') clone.value = state.martinChoice;
+
+  clone.addEventListener('change', (e) => {
+    if (sourceId === 'tzTamara') {
+      state.tamaraChoice = e.target.value || DEFAULTS.tamaraChoice;
+    } else if (sourceId === 'tzMartin') {
+      state.martinChoice = e.target.value || DEFAULTS.martinChoice;
+    }
+
+    syncTZStateFromChoices();
+    ensureEastWestOrder();
+    render();
+    tickClocks();
+  });
+
+  return clone;
+}
+
+function buildMobileClockCard({ label, sourceId = null, tz = null, superday = false }) {
+  const card = document.createElement('div');
+  card.className = 'mobile-clock-card';
+
+  const title = document.createElement('div');
+  title.className = 'mobile-clock-label';
+  title.textContent = label;
+  card.appendChild(title);
+
+  if (sourceId) {
+    const sel = buildTZClone(sourceId);
+    if (sel) card.appendChild(sel);
+  }
+
+  const face = document.createElement('div');
+  face.className = 'clockface';
+
+  const svg = makeClockSVG(superday ? 'superday' : 'normal');
+  face.appendChild(svg);
+  card.appendChild(face);
+
+  if (superday) {
+    const data = getSuperdayClockState();
+    applySuperdayToSVG(svg, data);
+
+    const meta = document.createElement('div');
+    meta.className = 'mobile-superday-meta';
+    meta.innerHTML = `
+      <div><span class="muted">SuperDay:</span> <span>${data.totalLabel}</span></div>
+      <div><span class="muted">Elapsed:</span> <span>${data.elapsedLabel}</span></div>
+    `;
+    card.appendChild(meta);
+  } else {
+    const now = DateTime.now().setZone(tz);
+    applyAnalogToSVG(svg, now);
+
+    const ampm = document.createElement('div');
+    ampm.className = 'ampm';
+    ampm.textContent = now.toFormat('a');
+    card.appendChild(ampm);
+  }
+
+  return card;
+}
+
+function renderClocksView() {
+  const wrap = document.createElement('div');
+  wrap.className = 'single-view-card clocks-view';
+
+  const grid = document.createElement('div');
+  grid.className = 'mobile-clocks-grid';
+
+  grid.appendChild(buildMobileClockCard({
+    label: 'Eastern TZ',
+    sourceId: 'tzTamara',
+    tz: state.tamaraTZ
+  }));
+
+  grid.appendChild(buildMobileClockCard({
+    label: 'SuperDay (now)',
+    superday: true
+  }));
+
+  grid.appendChild(buildMobileClockCard({
+    label: 'Western TZ',
+    sourceId: 'tzMartin',
+    tz: state.martinTZ
+  }));
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function tickClocks() {
+  ensureEastWestOrder();
+  const now = DateTime.now();
+
+  const tNow = now.setZone(state.tamaraTZ);
+  const mNow = now.setZone(state.martinTZ);
+
+  updateAnalog('clockTamara', tNow);
+  updateAnalog('clockMartin', mNow);
+
+  const ae = el('ampmEast');
+  const aw = el('ampmWest');
+  if (ae) ae.textContent = tNow.toFormat('a');
+  if (aw) aw.textContent = mNow.toFormat('a');
+
+  const todayISO = now.setZone(state.displayTZ).toISODate();
+  const bounds = superDayBounds(todayISO, state.tamaraTZ, state.martinTZ);
+  const startUTC = bounds.start.toUTC();
+  const endUTC = bounds.end.toUTC();
+  const durMs = endUTC.toMillis() - startUTC.toMillis();
+  const elapsedMs = clamp(now.toUTC().toMillis() - startUTC.toMillis(), 0, durMs);
+
+  if (el('sdTotal')) el('sdTotal').textContent = durationToHHMMCeilHalfHour(durMs);
+  if (el('sdElapsed')) el('sdElapsed').textContent = durationToHHMM(elapsedMs);
+
+  const nHours = Math.max(0.5, ceilToHalfHourHours(durMs / 3600000));
+  const q1 = roundHalfUp(nHours / 4);
+  const q2 = roundHalfUp(nHours / 2);
+  const q3 = roundHalfUp(3 * nHours / 4);
+
+  const svgS = el('clockSuperday')?.querySelector('svg');
+  if (svgS) {
+    const t12 = svgS.querySelector('#n12');
+    const t3 = svgS.querySelector('#n3');
+    const t6 = svgS.querySelector('#n6');
+    const t9 = svgS.querySelector('#n9');
+    if (t12) t12.textContent = '0';
+    if (t3) t3.textContent = String(q1);
+    if (t6) t6.textContent = String(q2);
+    if (t9) t9.textContent = String(q3);
+  }
+
+  const frac = (durMs === 0) ? 0 : (elapsedMs / durMs);
+  const hourAngle = frac * 360;
+
+  const totalSec = Math.floor(elapsedMs / 1000);
+  const sec = totalSec % 60;
+  const totalMin = Math.floor(totalSec / 60);
+  const min = totalMin % 60;
+
+  const minAngle = (min + sec / 60) * 6;
+  const secAngle = sec * 6;
+
+  const svg = el('clockSuperday')?.querySelector('svg');
+  if (svg) {
+    rotate(svg.querySelector('#h'), hourAngle);
+    rotate(svg.querySelector('#m'), minAngle);
+    rotate(svg.querySelector('#s'), secAngle);
+  }
+
+  if (isMobileAFDS() && state.view === 'clocks') {
+    renderCenter();
+  }
+}
+
+function updateAnalog(hostId, dt) {
+  const svg = el(hostId)?.querySelector('svg');
+  if (!svg) return;
+  applyAnalogToSVG(svg, dt);
+}
+
 // ---------- Controls ----------
-function bindControls(){
-  el('viewSelect').addEventListener('change', (e)=>{
+function bindControls() {
+  el('viewSelect')?.addEventListener('change', (e) => {
     state.view = e.target.value;
 
-    const mode = el('jumpMode').value;
+    const mode = el('jumpMode')?.value || 'seoian';
     const seo = canonicalSeoianDate(state.focusDateISO);
-    el('jumpInput').value = (mode === 'gregorian') ? fmtGreg(state.focusDateISO) : (seo.canonical ? seo.label : '');
+    if (el('jumpInput')) {
+      el('jumpInput').value = (mode === 'gregorian') ? fmtGreg(state.focusDateISO) : (seo.canonical ? seo.label : '');
+    }
 
-    if(state.view === 'day'){
+    if (state.view === 'day') {
       snapshotDay(state.focusDateISO);
       return;
     }
@@ -3101,39 +3292,40 @@ function bindControls(){
     render();
   });
 
-  el('btnToday').addEventListener('click', ()=>{
+  el('btnToday')?.addEventListener('click', () => {
     state.focusDateISO = DateTime.now().setZone(state.displayTZ).toISODate();
 
-    if(state.view === 'day'){
+    if (state.view === 'day') {
       snapshotDay(state.focusDateISO);
       return;
     }
 
     render();
-  }); 
+  });
 
-  el('btnPrev').addEventListener('click', ()=>{
-    if(state.view === 'month'){
+  el('btnPrev')?.addEventListener('click', () => {
+    if (state.view === 'month') {
       const seo = canonicalSeoianDate(state.focusDateISO);
-      if(seo.canonical){
+      if (seo.canonical) {
         let y = seo.year;
         let m = seo.canonical.monthNo - 1;
-        if(m < 1){ m = 13; y = y - 1; }
+        if (m < 1) { m = 13; y = y - 1; }
         const r = getRangeForMonth(y, m);
-        if(r){ state.focusDateISO = r.start; render(); return; }
+        if (r) { state.focusDateISO = r.start; render(); return; }
       }
     }
 
-    const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
+    const dt = DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ });
 
     let next;
-    if(state.view === 'week') next = dt.minus({weeks:1});
-    else if(state.view === 'day' || state.view === 'clocks') next = dt.minus({days:1});
-    else next = dt.minus({days:30});
+    if (state.view === 'week') next = dt.minus({ weeks: 1 });
+    else if (state.view === 'day' || state.view === 'clocks') next = dt.minus({ days: 1 });
+    else if (state.view === 'year') next = dt.minus({ years: 1 });
+    else next = dt.minus({ days: 30 });
 
     state.focusDateISO = next.toISODate();
 
-    if(state.view === 'day'){
+    if (state.view === 'day') {
       snapshotDay(state.focusDateISO);
       return;
     }
@@ -3141,28 +3333,29 @@ function bindControls(){
     render();
   });
 
-  el('btnNext').addEventListener('click', ()=>{
-    if(state.view === 'month'){
+  el('btnNext')?.addEventListener('click', () => {
+    if (state.view === 'month') {
       const seo = canonicalSeoianDate(state.focusDateISO);
-      if(seo.canonical){
+      if (seo.canonical) {
         let y = seo.year;
         let m = seo.canonical.monthNo + 1;
-        if(m > 13){ m = 1; y = y + 1; }
+        if (m > 13) { m = 1; y = y + 1; }
         const r = getRangeForMonth(y, m);
-        if(r){ state.focusDateISO = r.start; render(); return; }
+        if (r) { state.focusDateISO = r.start; render(); return; }
       }
     }
 
-    const dt = DateTime.fromISO(state.focusDateISO, {zone:state.displayTZ});
+    const dt = DateTime.fromISO(state.focusDateISO, { zone: state.displayTZ });
 
     let next;
-    if(state.view === 'week') next = dt.plus({weeks:1});
-    else if(state.view === 'day' || state.view === 'clocks') next = dt.plus({days:1});
-    else next = dt.plus({days:30});
+    if (state.view === 'week') next = dt.plus({ weeks: 1 });
+    else if (state.view === 'day' || state.view === 'clocks') next = dt.plus({ days: 1 });
+    else if (state.view === 'year') next = dt.plus({ years: 1 });
+    else next = dt.plus({ days: 30 });
 
     state.focusDateISO = next.toISODate();
 
-    if(state.view === 'day'){
+    if (state.view === 'day') {
       snapshotDay(state.focusDateISO);
       return;
     }
@@ -3170,14 +3363,14 @@ function bindControls(){
     render();
   });
 
-  el('toggleGregorian').addEventListener('change', ()=> render());
+  el('toggleGregorian')?.addEventListener('change', () => render());
 
-  function applyZoneChoice(which, value){
-    if(which === 'display'){
+  function applyZoneChoice(which, value) {
+    if (which === 'display') {
       state.displayChoice = value || DEFAULTS.displayChoice;
-    }else if(which === 'tamara'){
+    } else if (which === 'tamara') {
       state.tamaraChoice = value || DEFAULTS.tamaraChoice;
-    }else if(which === 'martin'){
+    } else if (which === 'martin') {
       state.martinChoice = value || DEFAULTS.martinChoice;
     }
 
@@ -3185,116 +3378,101 @@ function bindControls(){
     ensureEastWestOrder();
   }
 
-  el('displayTZ').addEventListener('change', (e)=>{
+  el('displayTZ')?.addEventListener('change', (e) => {
     applyZoneChoice('display', e.target.value);
     buildLunarPhaseCache();
 
-    if(state.snapshot?.dateISO){
+    if (state.snapshot?.dateISO) {
       snapshotDay(state.snapshot.dateISO);
-    }else{
+    } else {
       render();
     }
 
     refreshWeatherCache();
   });
 
-  el('tzTamara').addEventListener('change', (e)=>{
+  el('tzTamara')?.addEventListener('change', (e) => {
     applyZoneChoice('tamara', e.target.value);
 
-    if(state.snapshot?.dateISO){
+    if (state.snapshot?.dateISO) {
       snapshotDay(state.snapshot.dateISO);
-    }else{
+    } else {
       render();
     }
 
     tickClocks();
   });
 
-  el('tzMartin').addEventListener('change', (e)=>{
+  el('tzMartin')?.addEventListener('change', (e) => {
     applyZoneChoice('martin', e.target.value);
 
-    if(state.snapshot?.dateISO){
+    if (state.snapshot?.dateISO) {
       snapshotDay(state.snapshot.dateISO);
-    }else{
+    } else {
       render();
     }
 
     tickClocks();
   });
 
-  /*
-  el('displayTZ').addEventListener('change', (e)=>{
-    state.displayChoice = e.target.value || DEFAULTS.displayChoice;
-    state.displayTZ = timezoneFromChoice(state.displayChoice, 'UTC');
-
-    buildLunarPhaseCache();
-
-    if(state.snapshot?.dateISO){
-      snapshotDay(state.snapshot.dateISO);
-    }else{
-      render();
-    }
-
-    refreshWeatherCache();
-  });
-  */
-
-  el('btnFilters').addEventListener('click', ()=>{
+  el('btnFilters')?.addEventListener('click', () => {
     const dd = el('filtersDropdown');
-    dd.hidden = !dd.hidden;
+    if (dd) dd.hidden = !dd.hidden;
   });
 
-  document.addEventListener('click', (e)=>{
+  document.addEventListener('click', (e) => {
     const dd = el('filtersDropdown');
     const btn = el('btnFilters');
-    if(dd.hidden) return;
-    if(dd.contains(e.target) || btn.contains(e.target)) return;
+    if (!dd || !btn || dd.hidden) return;
+    if (dd.contains(e.target) || btn.contains(e.target)) return;
     dd.hidden = true;
   });
 
-  el('filterSupermonths').addEventListener('change', (e)=>{ state.filters.superMonths = e.target.checked; render(); });
-  el('filterSpecialDays').addEventListener('change', (e)=>{ state.filters.specialDays = e.target.checked; render(); });
-  el('filterStandardDays').addEventListener('change', (e)=>{ state.filters.standardDays = e.target.checked; render(); });
-  el('filterOneOff').addEventListener('change', (e)=>{ state.filters.oneOff = e.target.checked; render(); });
+  el('filterSupermonths')?.addEventListener('change', (e) => { state.filters.superMonths = e.target.checked; render(); });
+  el('filterSpecialDays')?.addEventListener('change', (e) => { state.filters.specialDays = e.target.checked; render(); });
+  el('filterStandardDays')?.addEventListener('change', (e) => { state.filters.standardDays = e.target.checked; render(); });
+  el('filterOneOff')?.addEventListener('change', (e) => { state.filters.oneOff = e.target.checked; render(); });
 
-  el('filterSupermonths').checked = state.filters.superMonths;
-  el('filterSpecialDays').checked = state.filters.specialDays;
-  el('filterStandardDays').checked = state.filters.standardDays;
-  el('filterOneOff').checked = state.filters.oneOff;
+  if (el('filterSupermonths')) el('filterSupermonths').checked = state.filters.superMonths;
+  if (el('filterSpecialDays')) el('filterSpecialDays').checked = state.filters.specialDays;
+  if (el('filterStandardDays')) el('filterStandardDays').checked = state.filters.standardDays;
+  if (el('filterOneOff')) el('filterOneOff').checked = state.filters.oneOff;
 
-  el('jumpInput').addEventListener('input', (e)=>{
-    const mode = el('jumpMode').value;
-    if(mode !== 'seoian' && mode !== 'gregorian') return;
+  el('jumpInput')?.addEventListener('input', (e) => {
+    const mode = el('jumpMode')?.value;
+    if (mode !== 'seoian' && mode !== 'gregorian') return;
 
-    const raw = e.target.value.replace(/[^0-9]/g,'').slice(0,8);
+    const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
     let out = '';
 
-    if(raw.length >= 2) out += raw.slice(0,2) + '/';
+    if (raw.length >= 2) out += raw.slice(0, 2) + '/';
     else out += raw;
 
-    if(raw.length >= 4) out += raw.slice(2,4) + '/';
-    else if(raw.length > 2) out += raw.slice(2);
+    if (raw.length >= 4) out += raw.slice(2, 4) + '/';
+    else if (raw.length > 2) out += raw.slice(2);
 
-    if(raw.length > 4) out += raw.slice(4);
+    if (raw.length > 4) out += raw.slice(4);
 
     e.target.value = out;
   });
 
-  el('jumpMode').addEventListener('change', ()=>{
-    el('jumpInput').value = '';
-    el('jumpInput').placeholder = 'DD/MM/YYYY';
+  el('jumpMode')?.addEventListener('change', () => {
+    if (el('jumpInput')) {
+      el('jumpInput').value = '';
+      el('jumpInput').placeholder = 'DD/MM/YYYY';
+    }
   });
 
-  el('btnJump').addEventListener('click', ()=>{
-    const mode = el('jumpMode').value;
-    const val = el('jumpInput').value;
+  el('btnJump')?.addEventListener('click', () => {
+    const mode = el('jumpMode')?.value || 'seoian';
+    const val = el('jumpInput')?.value || '';
 
-    if(mode === 'gregorian'){
+    if (mode === 'gregorian') {
       const iso = dateISOFromDMY(val);
-      if(!iso) return alert('Invalid Gregorian date (DD/MM/YYYY).');
+      if (!iso) return alert('Invalid Gregorian date (DD/MM/YYYY).');
       state.focusDateISO = iso;
 
-      if(state.view === 'day'){
+      if (state.view === 'day') {
         snapshotDay(state.focusDateISO);
         return;
       }
@@ -3304,87 +3482,41 @@ function bindControls(){
     }
 
     const m = val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if(!m) return alert('Invalid Seoian date (DD/MM/YYYY).');
+    if (!m) return alert('Invalid Seoian date (DD/MM/YYYY).');
 
     const dd = Number(m[1]);
     const mm = Number(m[2]);
     const yyyy = Number(m[3]);
 
     const iso = gregorianFromSeoian(dd, mm, yyyy);
-    if(!iso) return alert('Seoian date out of range for that SuperMonth.');
+    if (!iso) return alert('Seoian date out of range for that SuperMonth.');
 
     state.focusDateISO = iso;
 
-    if(state.view === 'day'){
+    if (state.view === 'day') {
       snapshotDay(state.focusDateISO);
       return;
     }
 
     render();
   });
-
-  /*
-  el('tzTamara').addEventListener('change', (e)=>{
-    state.tamaraChoice = e.target.value || DEFAULTS.tamaraChoice;
-    state.tamaraTZ = timezoneFromChoice(state.tamaraChoice, 'America/Phoenix');
-    ensureEastWestOrder();
-
-    if(state.snapshot?.dateISO){
-      snapshotDay(state.snapshot.dateISO);
-    }else{
-      render();
-    }
-
-    tickClocks();
-  });
-
-  el('tzMartin').addEventListener('change', (e)=>{
-    state.martinChoice = e.target.value || DEFAULTS.martinChoice;
-    state.martinTZ = timezoneFromChoice(state.martinChoice, 'Australia/Brisbane');
-    ensureEastWestOrder();
-
-    if(state.snapshot?.dateISO){
-      snapshotDay(state.snapshot.dateISO);
-    }else{
-      render();
-    }
-
-    tickClocks();
-  });
-  */
-
-  const sheet = el('bottomSheet');
-  el('sheetHandle').addEventListener('click', ()=>{
-    sheet.classList.toggle('expanded');
-    el('sheetHandle').querySelector('.sheet-handle-icon').textContent = sheet.classList.contains('expanded') ? '▾' : '▴';
-  });
-
-  sheet.querySelectorAll('.tab').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      sheet.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      const tab = btn.dataset.tab;
-      sheet.querySelectorAll('.sheet-pane').forEach(p=>p.classList.remove('active'));
-      el(tab === 'inspector' ? 'sheetInspector' : 'sheetClocks').classList.add('active');
-    });
-  });
 }
 
 // ---------- Boot ----------
-async function loadData(){
+async function loadData() {
   const cfgRes = await fetch('./data/supermonths_config.json');
   const rangesRes = await fetch('./data/supermonths_ranges_fallback.json');
   const daysRes = await fetch('./data/AFdS_Special_Days.csv');
   const silentRes = await fetch('./data/AFdS_Silent_Sounds.csv');
 
   let setDaySongsRes = null;
-  try{ setDaySongsRes = await fetch('./data/Set_Day_Songs.json'); }catch(e){ setDaySongsRes = null; }
+  try { setDaySongsRes = await fetch('./data/Set_Day_Songs.json'); } catch (e) { setDaySongsRes = null; }
 
   let oneOffRes = null;
-  try{ oneOffRes = await fetch('./data/AFdS_OneOff_StarSystems.csv'); }catch(e){ oneOffRes = null; }
+  try { oneOffRes = await fetch('./data/AFdS_OneOff_StarSystems.csv'); } catch (e) { oneOffRes = null; }
 
   let miavigRes = null;
-  try{ miavigRes = await fetch('./data/AFdS_MiAViG.csv'); }catch(e){ miavigRes = null; }
+  try { miavigRes = await fetch('./data/AFdS_MiAViG.csv'); } catch (e) { miavigRes = null; }
 
   state.data.config = await cfgRes.json();
   state.data.ranges = await rangesRes.json();
@@ -3400,12 +3532,12 @@ async function loadData(){
   const silentRaw = parseCSV(silentText);
 
   const silentSounds = [];
-  for(const r of silentRaw){
+  for (const r of silentRaw) {
     const url = pickField(r, ['Spotify URL', 'Spotify_URL', 'spotify_url', 'URL', 'Url', 'url']);
     const title = pickField(r, ['Song Title', 'Song_Title', 'title', 'Title']);
     const artists = pickField(r, ['Artists', 'Artist', 'artists', 'artist']);
 
-    if(!url) continue;
+    if (!url) continue;
 
     silentSounds.push({
       url,
@@ -3423,12 +3555,12 @@ async function loadData(){
   const overflowRaw = parseCSV(overflowText);
 
   const overflowSounds = [];
-  for(const r of overflowRaw){
+  for (const r of overflowRaw) {
     const url = pickField(r, ['Spotify URL', 'Spotify_URL', 'spotify_url', 'URL', 'Url', 'url']);
     const title = pickField(r, ['Song Title', 'Song_Title', 'title', 'Title']);
     const artists = pickField(r, ['Artists', 'Artist', 'artists', 'artist']);
 
-    if(!url) continue;
+    if (!url) continue;
 
     overflowSounds.push({
       url,
@@ -3440,24 +3572,24 @@ async function loadData(){
   state.data.overflowSounds = overflowSounds;
 
   let setDaySongsRaw = null;
-  if(setDaySongsRes && setDaySongsRes.ok){
+  if (setDaySongsRes && setDaySongsRes.ok) {
     setDaySongsRaw = await setDaySongsRes.json();
   }
 
   state.data.setDaySongs = buildSetDaySongsIndex(setDaySongsRaw);
 
   let oneOffRaw = [];
-  if(oneOffRes && oneOffRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await oneOffRes.text()));
-  if(miavigRes && miavigRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await miavigRes.text()));
+  if (oneOffRes && oneOffRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await oneOffRes.text()));
+  if (miavigRes && miavigRes.ok) oneOffRaw = oneOffRaw.concat(parseCSV(await miavigRes.text()));
 
   const syByKey = new Map();
   const gyDefs = [];
   const oneOffDefs = [];
 
-  for(const r of raw){
+  for (const r of raw) {
     const id = r.ID || r.id || '';
     const title = r.Title || r.title || '';
-    if(!id || !title) continue;
+    if (!id || !title) continue;
 
     const anchorType = (r.Anchor_Type || r.anchor_type || 'SY').toUpperCase();
     const category = (r.Category || r.category || '').trim() || (anchorType === 'SY' ? 'Special' : 'Standard');
@@ -3500,28 +3632,28 @@ async function loadData(){
       endDay: endMD.day,
     };
 
-    if(anchorType === 'SY'){
-      if(!def.syMonth || !def.syDay) continue;
+    if (anchorType === 'SY') {
+      if (!def.syMonth || !def.syDay) continue;
       const key = `${def.syMonth}-${def.syDay}`;
-      if(!syByKey.has(key)) syByKey.set(key, []);
+      if (!syByKey.has(key)) syByKey.set(key, []);
       syByKey.get(key).push(def);
-    }else{
+    } else {
       gyDefs.push(def);
     }
   }
 
-  for(const r of oneOffRaw){
+  for (const r of oneOffRaw) {
     const id = r.ID || r.id || r['\ufeffID'] || '';
     const title = r.Title || r.title || '';
-    if(!id || !title) continue;
+    if (!id || !title) continue;
 
     const anchorType = (r.Anchor_Type || r.anchor_type || 'GY_ONEOFF').toUpperCase();
-    if(anchorType !== 'GY_ONEOFF') continue;
+    if (anchorType !== 'GY_ONEOFF') continue;
 
     const originTZ = String(r.Origin_TZ || r.origin_tz || 'America/Toronto').trim() || 'America/Toronto';
     const originStr = r.Origin_Gregorian_Date || r.origin_gregorian_date || '';
     const dtOrigin = parseDateTimeFlexible(originStr, originTZ);
-    if(!dtOrigin || !dtOrigin.isValid) continue;
+    if (!dtOrigin || !dtOrigin.isValid) continue;
 
     const endStr = r.End_Gregorian_Date || r.end_gregorian_date || '';
     const endTZ = String(r.End_TZ || r.end_tz || originTZ).trim() || originTZ;
@@ -3532,11 +3664,11 @@ async function loadData(){
     const startUtcMs = dtOrigin.toUTC().toMillis();
     let endUtcMs;
 
-    if(dtEnd && dtEnd.isValid){
+    if (dtEnd && dtEnd.isValid) {
       endUtcMs = dtEnd.toUTC().toMillis();
-      if(endUtcMs <= startUtcMs) continue;
-    }else{
-      endUtcMs = dtOrigin.plus({minutes: durMin}).toUTC().toMillis();
+      if (endUtcMs <= startUtcMs) continue;
+    } else {
+      endUtcMs = dtOrigin.plus({ minutes: durMin }).toUTC().toMillis();
     }
 
     const category = (r.Category || r.category || 'OneOFF').trim() || 'OneOFF';
@@ -3564,11 +3696,11 @@ async function loadData(){
     });
   }
 
-  for(const [, arr] of syByKey.entries()){
-    arr.sort((a,b)=> (a.rank - b.rank) || (a.sequence - b.sequence) || a.title.localeCompare(b.title));
+  for (const [, arr] of syByKey.entries()) {
+    arr.sort((a, b) => (a.rank - b.rank) || (a.sequence - b.sequence) || a.title.localeCompare(b.title));
   }
 
-  gyDefs.sort((a,b)=> (a.rank - b.rank) || (a.sequence - b.sequence) || a.title.localeCompare(b.title));
+  gyDefs.sort((a, b) => (a.rank - b.rank) || (a.sequence - b.sequence) || a.title.localeCompare(b.title));
 
   state.data.syByKey = syByKey;
   state.data.gyDefs = gyDefs;
@@ -3577,8 +3709,16 @@ async function loadData(){
   buildLunarPhaseCache();
 }
 
-(async function init(){
+let viewportResizeTimer = null;
+
+window.addEventListener('resize', () => {
+  clearTimeout(viewportResizeTimer);
+  viewportResizeTimer = setTimeout(handleViewportModeChange, 120);
+});
+
+(async function init() {
   setUpTZList();
+  populateViewSelect();
   bindControls();
   await loadData();
   await refreshWeatherCache();
