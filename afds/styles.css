@@ -925,6 +925,16 @@ body{
   overflow-wrap: anywhere;
 }
 
+.single-view-card{
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+  padding: 14px;
+}
+
 .single-view-card .panel-inner{
   padding: 0;
   height: auto;
@@ -1086,29 +1096,62 @@ body{
     min-height:auto;
   }
 
-  .cal-header{
-    flex-direction:column;
-    align-items:stretch;
-  }
+.cal-header{
+  padding:10px;
+  gap:10px;
+  flex-direction:column;
+  align-items:stretch;
+}
 
-  .nav{
-    width:100%;
-    flex-wrap:wrap;
-  }
+.nav{
+  width:100%;
+  flex-wrap:wrap;
+  gap:8px;
+}
 
-  .title{
-    min-width:0;
-    flex:1 1 100%;
-  }
+.nav .btn{
+  height:32px;
+  padding:0 10px;
+  font-size:0.95rem;
+}
 
-  .controls{
-    width:100%;
-    justify-content:flex-start;
-  }
+.nav .iconbtn{
+  width:32px;
+  height:32px;
+  font-size:17px;
+  line-height:30px;
+}
 
-  .control-mobile-extra{
-    display:none;
-  }
+.title{
+  min-width:0;
+  flex:1 1 100%;
+  font-size:clamp(1.05rem, 4.4vw, 1.35rem);
+}
+
+.controls{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(110px, 130px) minmax(0, 1fr);
+  gap:10px 12px;
+  align-items:end;
+}
+
+.control-view{
+  grid-column:1;
+}
+
+.control-displaytz{
+  grid-column:2;
+}
+
+.control-desktop-only{
+  display:none;
+}
+
+.control-view select,
+.control-displaytz select{
+  width:100%;
+}
 
   .cal-surface{
     overflow:visible;
